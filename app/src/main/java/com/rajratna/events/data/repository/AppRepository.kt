@@ -29,6 +29,7 @@ class AppRepository(
     suspend fun updateItem(item: Item) = itemDao.updateItem(item)
     suspend fun setItemActive(id: Long, isActive: Boolean) = itemDao.setItemActive(id, isActive)
     suspend fun getRentedQuantities() = orderDao.getRentedQuantities()
+    suspend fun getAllItemsList() = itemDao.getAllItemsList()
 
     // ══════════════════════════════════════════════════════════
     // CUSTOMERS
@@ -83,6 +84,7 @@ class AppRepository(
     suspend fun getTotalTransportRent(start: Long, end: Long): Double = orderDao.getTotalTransportRent(start, end)
     suspend fun getTotalPendingBalance(start: Long, end: Long): Double = orderDao.getTotalPendingBalance(start, end)
     suspend fun getOverallPendingBalance(): Double = orderDao.getOverallPendingBalance()
+    suspend fun getActiveOrderCount(): Int = orderDao.getActiveOrderCount()
 
     // ── Order Items ─────────────────────────────────────────
 
@@ -95,13 +97,59 @@ class AppRepository(
         orderDao.getPendingReturnOrders(endOfToday, limit)
     suspend fun getPendingReturnCount(endOfToday: Long) =
         orderDao.getPendingReturnCount(endOfToday)
+    suspend fun getReturnedTodayCount(start: Long, end: Long) =
+        orderDao.getReturnedTodayCount(start, end)
     suspend fun getTodayActiveCount(start: Long, end: Long) =
         orderDao.getTodayActiveCount(start, end)
     suspend fun getTodayReturnedCount(start: Long, end: Long) =
         orderDao.getTodayReturnedCount(start, end)
     suspend fun getFirstOrderItem(orderId: Long) =
         orderDao.getFirstOrderItem(orderId)
-    suspend fun getAllItemsList() = itemDao.getAllItemsList()
+
+    // ══════════════════════════════════════════════════════════
+    // RETURNS
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Get all orders with pending return items.
+     */
+    suspend fun getOrdersWithPendingReturns(): List<Order> =
+        orderDao.getOrdersWithPendingReturns()
+
+    /**
+     * Get completed/returned orders.
+     */
+    suspend fun getReturnedOrders(): List<Order> =
+        orderDao.getReturnedOrders()
+
+    /**
+     * Get returned orders within a date range.
+     */
+    suspend fun getReturnedOrdersInRange(start: Long, end: Long): List<Order> =
+        orderDao.getReturnedOrdersInRange(start, end)
+
+    /**
+     * Record return of items for an order.
+     * Updates each order item's returnedQuantity.
+     * If all items are fully returned, marks order as Completed.
+     *
+     * @param returnEntries map of orderItemId to quantity being returned now
+     */
+    suspend fun recordReturn(orderId: Long, returnEntries: Map<Long, Int>) {
+        // Update each order item's returned quantity
+        for ((orderItemId, returnedNow) in returnEntries) {
+            if (returnedNow <= 0) continue
+            val items = orderDao.getOrderItemsList(orderId)
+            val item = items.find { it.id == orderItemId } ?: continue
+            val newReturned = (item.returnedQuantity + returnedNow).coerceAtMost(item.quantity)
+            orderDao.updateReturnedQuantity(orderItemId, newReturned)
+        }
+
+        // Check if all items are fully returned
+        if (orderDao.areAllItemsReturned(orderId)) {
+            orderDao.updateOrderStatus(orderId, OrderStatus.COMPLETED)
+        }
+    }
 
     // ══════════════════════════════════════════════════════════
     // PAYMENTS

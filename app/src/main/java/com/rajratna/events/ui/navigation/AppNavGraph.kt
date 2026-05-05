@@ -1,6 +1,7 @@
 package com.rajratna.events.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -11,28 +12,38 @@ import com.rajratna.events.ui.screens.customerdetails.CustomerDetailsScreen
 import com.rajratna.events.ui.screens.customers.CustomersScreen
 import com.rajratna.events.ui.screens.dashboard.DashboardScreen
 import com.rajratna.events.ui.screens.items.ItemsScreen
+import com.rajratna.events.ui.screens.more.MoreScreen
 import com.rajratna.events.ui.screens.neworder.NewOrderScreen
 import com.rajratna.events.ui.screens.orderdetails.OrderDetailsScreen
 import com.rajratna.events.ui.screens.orders.OrdersListScreen
 import com.rajratna.events.ui.screens.payments.PaymentsScreen
 import com.rajratna.events.ui.screens.reports.ReportsScreen
+import com.rajratna.events.ui.screens.returns.ReturnsScreen
 
 @Composable
-fun AppNavGraph(navController: NavHostController) {
+fun AppNavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Dashboard.route
+        startDestination = Screen.Dashboard.route,
+        modifier = modifier
     ) {
         // Dashboard
         composable(Screen.Dashboard.route) {
             DashboardScreen(
                 onNavigateToNewOrder = { navController.navigate(Screen.NewOrder.route) },
                 onNavigateToOrders = { navController.navigate(Screen.OrdersList.route) },
-                onNavigateToCustomers = { navController.navigate(Screen.Customers.route) },
-                onNavigateToPayments = { navController.navigate(Screen.Payments.route) },
-                onNavigateToReports = { navController.navigate(Screen.Reports.route) },
                 onNavigateToItems = { navController.navigate(Screen.ItemsRates.route) },
-                onNavigateToBackup = { navController.navigate(Screen.Backup.route) }
+                onNavigateToBackup = { navController.navigate(Screen.Backup.route) },
+                onNavigateToReturns = {
+                    navController.navigate(Screen.Returns.route) {
+                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                onNavigateToOrderDetails = { orderId ->
+                    navController.navigate(Screen.OrderDetails.createRoute(orderId))
+                }
             )
         }
 
@@ -82,6 +93,15 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
 
+        // Returns
+        composable(Screen.Returns.route) {
+            ReturnsScreen(
+                onNavigateToOrderDetails = { orderId ->
+                    navController.navigate(Screen.OrderDetails.createRoute(orderId))
+                }
+            )
+        }
+
         // Customers
         composable(Screen.Customers.route) {
             CustomersScreen(
@@ -117,7 +137,7 @@ fun AppNavGraph(navController: NavHostController) {
             ReportsScreen(onNavigateBack = { navController.popBackStack() })
         }
 
-        // Items & Rates
+        // Items & Rates (also Inventory tab)
         composable(Screen.ItemsRates.route) {
             ItemsScreen(onNavigateBack = { navController.popBackStack() })
         }
@@ -125,6 +145,16 @@ fun AppNavGraph(navController: NavHostController) {
         // Backup & Restore
         composable(Screen.Backup.route) {
             BackupScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        // More
+        composable(Screen.More.route) {
+            MoreScreen(
+                onNavigateToCustomers = { navController.navigate(Screen.Customers.route) },
+                onNavigateToPayments = { navController.navigate(Screen.Payments.route) },
+                onNavigateToReports = { navController.navigate(Screen.Reports.route) },
+                onNavigateToBackup = { navController.navigate(Screen.Backup.route) }
+            )
         }
     }
 }

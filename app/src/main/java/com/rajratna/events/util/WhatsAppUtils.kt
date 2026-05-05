@@ -76,6 +76,30 @@ Balance: ${order.balanceAmount.toInt()} rs
     }
 
     /**
+     * Generate return reminder message for pending items.
+     */
+    fun generateReturnReminder(order: Order, pendingItems: List<OrderItem>): String {
+        val sb = StringBuilder()
+        sb.appendLine("Hello ${order.customerName},")
+        sb.appendLine()
+        sb.appendLine("Your rented items for Bill No. ${order.billNumber} are pending return.")
+        sb.appendLine()
+        sb.appendLine("Pending items:")
+        pendingItems.forEach { item ->
+            val pending = item.quantity - item.returnedQuantity
+            if (pending > 0) {
+                sb.appendLine("${item.itemName}: $pending")
+            }
+        }
+        sb.appendLine()
+        sb.appendLine("Return Date: ${DateUtils.formatDate(order.returnDate)}")
+        sb.appendLine()
+        sb.appendLine("Please return the items as soon as possible.")
+
+        return sb.toString()
+    }
+
+    /**
      * Open WhatsApp with a pre-filled message to the customer's number.
      */
     fun shareOnWhatsApp(context: Context, phoneNumber: String, message: String) {

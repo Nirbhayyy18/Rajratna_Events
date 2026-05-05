@@ -127,34 +127,118 @@ interface OrderDao {
     @Query("SELECT * FROM order_items")
     suspend fun getAllOrderItemsList(): List<OrderItem>
 
+    /**
+     * Rented quantities per item — subtracts returnedQuantity.
+     * Only counts orders that are active (not completed/cancelled).
+     */
     @Query("""
-        SELECT oi.itemId, COALESCE(SUM(oi.quantity), 0) AS totalRented
+        SELECT oi.itemId, COALESCE(SUM(oi.quantity - oi.returnedQuantity), 0) AS totalRented
         FROM order_items oi
         INNER JOIN orders o ON oi.orderId = o.id
-        WHERE o.orderStatus IN ('Confirmed', 'Delivered')
+        WHERE o.orderStatus IN ('Pending', 'Confirmed', 'Delivered')
+        AND (oi.quantity - oi.returnedQuantity) > 0
         GROUP BY oi.itemId
     """)
     suspend fun getRentedQuantities(): List<RentedQuantity>
 
-    // ── Dashboard: Pending Returns ──────────────────────────
+    // ── Return Tracking ─────────────────────────────────────
 
+    /**
+     * Update the returned quantity for a specific order item.
+     */
+    @Query("UPDATE order_items SET returnedQuantity = :returnedQuantity WHERE id = :orderItemId")
+    suspend fun updateReturnedQuantity(orderItemId: Long, returnedQuantity: Int)
+
+    /**
+     * Check if all items in an order are fully returned.
+     */
     @Query("""
-        SELECT * FROM orders
-        WHERE orderStatus IN ('Confirmed', 'Delivered')
-        AND returnDate <= :endOfToday
-        ORDER BY returnDate ASC
+        SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END
+        FROM order_items
+        WHERE orderId = :orderId AND quantity > returnedQuantity
+    """)
+    suspend fun areAllItemsReturned(orderId: Long): Boolean
+
+    /**
+     * Orders with pending return items (not cancelled, has unreturned items).
+     * Ordered by return date ascending (most urgent first).
+     */
+    @Query("""
+        SELECT DISTINCT o.* FROM orders o
+        INNER JOIN order_items oi ON o.id = oi.orderId
+        WHERE o.orderStatus NOT IN ('Cancelled', 'Completed')
+        AND oi.quantity > oi.returnedQuantity
+        ORDER BY o.returnDate ASC
+    """)
+    suspend fun getOrdersWithPendingReturns(): List<Order>
+
+    /**
+     * Orders with pending returns, limited for dashboard preview.
+     */
+    @Query("""
+        SELECT DISTINCT o.* FROM orders o
+        INNER JOIN order_items oi ON o.id = oi.orderId
+        WHERE o.orderStatus NOT IN ('Cancelled', 'Completed')
+        AND oi.quantity > oi.returnedQuantity
+        AND o.returnDate <= :endOfToday
+        ORDER BY o.returnDate ASC
         LIMIT :limit
     """)
     suspend fun getPendingReturnOrders(endOfToday: Long, limit: Int = 3): List<Order>
 
+    /**
+     * Count of orders with pending returns (due today or overdue).
+     */
     @Query("""
-        SELECT COUNT(*) FROM orders
-        WHERE orderStatus IN ('Confirmed', 'Delivered')
-        AND returnDate <= :endOfToday
+        SELECT COUNT(DISTINCT o.id) FROM orders o
+        INNER JOIN order_items oi ON o.id = oi.orderId
+        WHERE o.orderStatus NOT IN ('Cancelled', 'Completed')
+        AND oi.quantity > oi.returnedQuantity
+        AND o.returnDate <= :endOfToday
     """)
     suspend fun getPendingReturnCount(endOfToday: Long): Int
 
+    /**
+     * Orders that were completed (all items returned) today.
+     */
+    @Query("""
+        SELECT COUNT(*) FROM orders
+        WHERE orderStatus = 'Completed'
+        AND updatedAt >= :start AND updatedAt < :end
+    """)
+    suspend fun getReturnedTodayCount(start: Long, end: Long): Int
+
+    /**
+     * Completed orders (used for Returned tab in Returns screen).
+     */
+    @Query("""
+        SELECT * FROM orders
+        WHERE orderStatus = 'Completed'
+        ORDER BY updatedAt DESC
+    """)
+    suspend fun getReturnedOrders(): List<Order>
+
+    /**
+     * Completed orders within a date range.
+     */
+    @Query("""
+        SELECT * FROM orders
+        WHERE orderStatus = 'Completed'
+        AND updatedAt >= :start AND updatedAt < :end
+        ORDER BY updatedAt DESC
+    """)
+    suspend fun getReturnedOrdersInRange(start: Long, end: Long): List<Order>
+
     // ── Dashboard: Today's Order Counts ─────────────────────
+
+    /**
+     * Count of active orders created today (Pending/Confirmed/Delivered).
+     */
+    @Query("""
+        SELECT COUNT(*) FROM orders
+        WHERE orderStatus IN ('Pending', 'Confirmed', 'Delivered')
+    """)
+    suspend fun getActiveOrderCount(): Int
 
     @Query("""
         SELECT COUNT(*) FROM orders
@@ -177,4 +261,3 @@ interface OrderDao {
 }
 
 data class RentedQuantity(val itemId: Long, val totalRented: Int)
-
