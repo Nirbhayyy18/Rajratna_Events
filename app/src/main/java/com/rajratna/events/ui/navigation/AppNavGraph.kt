@@ -34,6 +34,8 @@ fun AppNavGraph(navController: NavHostController, modifier: Modifier = Modifier)
                 onNavigateToOrders = { navController.navigate(Screen.OrdersList.route) },
                 onNavigateToItems = { navController.navigate(Screen.ItemsRates.route) },
                 onNavigateToBackup = { navController.navigate(Screen.Backup.route) },
+                onNavigateToPayments = { navController.navigate(Screen.Payments.route) },
+                onNavigateToReports = { navController.navigate(Screen.Reports.route) },
                 onNavigateToReturns = {
                     navController.navigate(Screen.Returns.route) {
                         popUpTo(navController.graph.startDestinationId) { saveState = true }
