@@ -54,6 +54,7 @@ data class ReturnsState(
     val isLoading: Boolean = true,
     val selectedTab: Int = 0, // 0 = Pending, 1 = Returned
     val pendingFilter: PendingFilter = PendingFilter.ALL,
+    val selectedDate: Long? = null,
     val returnedFilter: ReturnedFilter = ReturnedFilter.TODAY,
     val pendingOrders: List<PendingReturnOrder> = emptyList(),
     val filteredPendingOrders: List<PendingReturnOrder> = emptyList(),
@@ -125,8 +126,13 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun setPendingFilter(filter: PendingFilter) {
-        _state.value = _state.value.copy(pendingFilter = filter)
+        _state.value = _state.value.copy(pendingFilter = filter, selectedDate = null)
         applyPendingFilter(filter)
+    }
+
+    fun setSelectedDate(date: Long?) {
+        _state.value = _state.value.copy(selectedDate = date)
+        applyPendingFilter(_state.value.pendingFilter)
     }
 
     fun setReturnedFilter(filter: ReturnedFilter) {
@@ -135,11 +141,19 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun applyPendingFilter(filter: PendingFilter) {
-        val filtered = when (filter) {
-            PendingFilter.ALL -> _state.value.pendingOrders
-            PendingFilter.DUE_TODAY -> _state.value.pendingOrders.filter { it.isDueToday }
-            PendingFilter.OVERDUE -> _state.value.pendingOrders.filter { it.isOverdue }
-            PendingFilter.UPCOMING -> _state.value.pendingOrders.filter { it.isUpcoming }
+        val selectedDate = _state.value.selectedDate
+        val filtered = if (selectedDate != null) {
+            val dateEnd = selectedDate + 86400000L // 24 hours in ms
+            _state.value.pendingOrders.filter { 
+                it.order.returnDate in selectedDate until dateEnd
+            }
+        } else {
+            when (filter) {
+                PendingFilter.ALL -> _state.value.pendingOrders
+                PendingFilter.DUE_TODAY -> _state.value.pendingOrders.filter { it.isDueToday }
+                PendingFilter.OVERDUE -> _state.value.pendingOrders.filter { it.isOverdue }
+                PendingFilter.UPCOMING -> _state.value.pendingOrders.filter { it.isUpcoming }
+            }
         }
         _state.value = _state.value.copy(filteredPendingOrders = filtered)
     }
