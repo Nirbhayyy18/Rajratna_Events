@@ -24,6 +24,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rajratna.events.ui.theme.*
 import com.rajratna.events.util.DateUtils
 import com.rajratna.events.util.WhatsAppUtils
+import java.util.Calendar
+import android.app.DatePickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,7 +143,8 @@ private fun PendingReturnsTab(
         // Filters
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             val filters = listOf(
                 PendingFilter.ALL to "All",
@@ -151,11 +154,67 @@ private fun PendingReturnsTab(
             )
             items(filters) { (filter, label) ->
                 FilterChip(
-                    selected = state.pendingFilter == filter,
+                    selected = state.pendingFilter == filter && state.selectedDate == null,
                     onClick = { viewModel.setPendingFilter(filter) },
                     label = { Text(label, style = MaterialTheme.typography.labelMedium) },
                     shape = RoundedCornerShape(50)
                 )
+            }
+            item {
+                var showDatePicker by remember { mutableStateOf(false) }
+                val dateLabel = if (state.selectedDate != null) {
+                    "📅 " + DateUtils.formatShortDate(state.selectedDate)
+                } else {
+                    "📅 Date"
+                }
+                
+                FilterChip(
+                    selected = state.selectedDate != null,
+                    onClick = { showDatePicker = true },
+                    label = { Text(dateLabel, style = MaterialTheme.typography.labelMedium) },
+                    shape = RoundedCornerShape(50)
+                )
+
+                if (showDatePicker) {
+                    val cal = Calendar.getInstance()
+                    if (state.selectedDate != null) {
+                        cal.timeInMillis = state.selectedDate
+                    }
+                    DatePickerDialog(
+                        context,
+                        { _, year, month, day ->
+                            val c = Calendar.getInstance()
+                            c.set(year, month, day, 0, 0, 0)
+                            c.set(Calendar.MILLISECOND, 0)
+                            viewModel.setSelectedDate(c.timeInMillis)
+                            showDatePicker = false
+                        },
+                        cal.get(Calendar.YEAR),
+                        cal.get(Calendar.MONTH),
+                        cal.get(Calendar.DAY_OF_MONTH)
+                    ).apply {
+                        setOnCancelListener { showDatePicker = false }
+                    }.show()
+                }
+            }
+        }
+
+        if (state.selectedDate != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Filtered by Expected Return: ${DateUtils.formatDate(state.selectedDate)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                TextButton(onClick = { viewModel.setSelectedDate(null) }) {
+                    Text("Clear", style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
 
@@ -332,11 +391,14 @@ private fun ReturnedTab(
     viewModel: ReturnsViewModel,
     onNavigateToOrderDetails: (Long) -> Unit
 ) {
+    val context = LocalContext.current
+
     Column {
         // Filters
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             val filters = listOf(
                 ReturnedFilter.TODAY to "Today",
@@ -346,11 +408,67 @@ private fun ReturnedTab(
             )
             items(filters) { (filter, label) ->
                 FilterChip(
-                    selected = state.returnedFilter == filter,
+                    selected = state.returnedFilter == filter && state.selectedDate == null,
                     onClick = { viewModel.setReturnedFilter(filter) },
                     label = { Text(label, style = MaterialTheme.typography.labelMedium) },
                     shape = RoundedCornerShape(50)
                 )
+            }
+            item {
+                var showDatePicker by remember { mutableStateOf(false) }
+                val dateLabel = if (state.selectedDate != null) {
+                    "📅 " + DateUtils.formatShortDate(state.selectedDate)
+                } else {
+                    "📅 Date"
+                }
+                
+                FilterChip(
+                    selected = state.selectedDate != null,
+                    onClick = { showDatePicker = true },
+                    label = { Text(dateLabel, style = MaterialTheme.typography.labelMedium) },
+                    shape = RoundedCornerShape(50)
+                )
+
+                if (showDatePicker) {
+                    val cal = Calendar.getInstance()
+                    if (state.selectedDate != null) {
+                        cal.timeInMillis = state.selectedDate
+                    }
+                    DatePickerDialog(
+                        context,
+                        { _, year, month, day ->
+                            val c = Calendar.getInstance()
+                            c.set(year, month, day, 0, 0, 0)
+                            c.set(Calendar.MILLISECOND, 0)
+                            viewModel.setSelectedDate(c.timeInMillis)
+                            showDatePicker = false
+                        },
+                        cal.get(Calendar.YEAR),
+                        cal.get(Calendar.MONTH),
+                        cal.get(Calendar.DAY_OF_MONTH)
+                    ).apply {
+                        setOnCancelListener { showDatePicker = false }
+                    }.show()
+                }
+            }
+        }
+
+        if (state.selectedDate != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Filtered by Returned Date: ${DateUtils.formatDate(state.selectedDate)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                TextButton(onClick = { viewModel.setSelectedDate(null) }) {
+                    Text("Clear", style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
 
