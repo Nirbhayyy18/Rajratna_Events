@@ -73,4 +73,11 @@ class OrderDetailsViewModel(application: Application) : AndroidViewModel(applica
             onSuccess()
         }
     }
+
+    fun recordReturn(returnEntries: Map<Long, Int>, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            repository.recordReturn(currentOrderId, returnEntries)
+            onSuccess()
+        }
+    }
 }

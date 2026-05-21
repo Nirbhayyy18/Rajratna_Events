@@ -167,7 +167,7 @@ interface OrderDao {
     @Query("""
         SELECT DISTINCT o.* FROM orders o
         INNER JOIN order_items oi ON o.id = oi.orderId
-        WHERE o.orderStatus IN ('Confirmed', 'Delivered')
+        WHERE o.orderStatus IN ('Confirmed', 'Delivered', 'Completed')
         AND oi.quantity > oi.returnedQuantity
         AND oi.isCustomerOwned = 0
         ORDER BY o.returnDate ASC
@@ -180,7 +180,7 @@ interface OrderDao {
     @Query("""
         SELECT DISTINCT o.* FROM orders o
         INNER JOIN order_items oi ON o.id = oi.orderId
-        WHERE o.orderStatus IN ('Confirmed', 'Delivered')
+        WHERE o.orderStatus IN ('Confirmed', 'Delivered', 'Completed')
         AND oi.quantity > oi.returnedQuantity
         AND o.returnDate <= :endOfToday
         AND oi.isCustomerOwned = 0
@@ -195,7 +195,7 @@ interface OrderDao {
     @Query("""
         SELECT COUNT(DISTINCT o.id) FROM orders o
         INNER JOIN order_items oi ON o.id = oi.orderId
-        WHERE o.orderStatus IN ('Confirmed', 'Delivered')
+        WHERE o.orderStatus IN ('Confirmed', 'Delivered', 'Completed')
         AND oi.quantity > oi.returnedQuantity
         AND o.returnDate <= :endOfToday
         AND oi.isCustomerOwned = 0

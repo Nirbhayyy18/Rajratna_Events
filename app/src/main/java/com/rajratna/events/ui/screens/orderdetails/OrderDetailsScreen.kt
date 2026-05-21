@@ -36,8 +36,27 @@ fun OrderDetailsScreen(
     var showPaymentDialog by remember { mutableStateOf(false) }
     var showCancelConfirm by remember { mutableStateOf(false) }
     var showDeliverConfirm by remember { mutableStateOf(false) }
+    var showRecordReturnDialog by remember { mutableStateOf(false) }
+    var returnEntries by remember { mutableStateOf<List<LocalReturnEntry>>(emptyList()) }
 
     LaunchedEffect(orderId) { viewModel.loadOrder(orderId) }
+
+    LaunchedEffect(showRecordReturnDialog, state.orderItems) {
+        if (showRecordReturnDialog) {
+            returnEntries = state.orderItems
+                .filter { !it.isCustomerOwned && it.quantity > it.returnedQuantity }
+                .map { item ->
+                    LocalReturnEntry(
+                        orderItemId = item.id,
+                        itemName = item.itemName,
+                        quantity = item.quantity,
+                        alreadyReturned = item.returnedQuantity,
+                        pendingQuantity = item.quantity - item.returnedQuantity,
+                        returnedNow = 0
+                    )
+                }
+        }
+    }
 
     val order = state.order
 
@@ -202,6 +221,19 @@ fun OrderDetailsScreen(
                                 Icon(Icons.Default.Payment, null); Spacer(Modifier.width(8.dp)); Text("Record Payment")
                             }
                         }
+                        val hasPendingReturns = state.orderItems.any { !it.isCustomerOwned && it.quantity > it.returnedQuantity }
+                        if ((order.orderStatus == OrderStatus.DELIVERED || order.orderStatus == OrderStatus.COMPLETED) && hasPendingReturns) {
+                            Button(
+                                onClick = { showRecordReturnDialog = true },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                            ) {
+                                Icon(Icons.Default.KeyboardReturn, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Record Return")
+                            }
+                        }
                         val statusActions = buildList {
                             if (order.orderStatus == OrderStatus.PENDING) add(OrderStatus.CONFIRMED to "Confirm Order")
                             if (order.orderStatus == OrderStatus.CONFIRMED) add(OrderStatus.DELIVERED to "Mark Delivered")
@@ -220,8 +252,14 @@ fun OrderDetailsScreen(
                                         }
                                     }
                                     OrderStatus.COMPLETED -> {
-                                        viewModel.updateStatus(status) {
-                                            android.widget.Toast.makeText(context, "Order completed successfully", android.widget.Toast.LENGTH_SHORT).show()
+                                        val pendingItems = state.orderItems.filter { !it.isCustomerOwned && it.quantity > it.returnedQuantity }
+                                        if (pendingItems.isNotEmpty()) {
+                                            android.widget.Toast.makeText(context, "Please record item returns before completing this order.", android.widget.Toast.LENGTH_LONG).show()
+                                            showRecordReturnDialog = true
+                                        } else {
+                                            viewModel.updateStatus(status) {
+                                                android.widget.Toast.makeText(context, "Order completed successfully", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
                                         }
                                     }
                                     else -> {
@@ -305,6 +343,120 @@ fun OrderDetailsScreen(
             }
         )
     }
+
+    // Record Return Dialog
+    if (showRecordReturnDialog && order != null) {
+        AlertDialog(
+            onDismissRequest = { showRecordReturnDialog = false },
+            title = { Text("Record Return", fontWeight = FontWeight.Bold) },
+            text = {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(returnEntries) { entry ->
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(entry.itemName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Sent: ${entry.quantity}", style = MaterialTheme.typography.bodyMedium)
+                                    Text("Returned: ${entry.alreadyReturned}", style = MaterialTheme.typography.bodyMedium)
+                                    Text("Pending: ${entry.pendingQuantity}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Returned Now:", style = MaterialTheme.typography.bodyMedium)
+                                    
+                                    IconButton(
+                                        onClick = {
+                                            returnEntries = returnEntries.map { e ->
+                                                if (e.orderItemId == entry.orderItemId) {
+                                                    e.copy(returnedNow = maxOf(0, e.returnedNow - 1))
+                                                } else e
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Remove, null)
+                                    }
+                                    
+                                    Text(
+                                        text = entry.returnedNow.toString(),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    )
+                                    
+                                    IconButton(
+                                        onClick = {
+                                            returnEntries = returnEntries.map { e ->
+                                                if (e.orderItemId == entry.orderItemId) {
+                                                    e.copy(returnedNow = minOf(e.pendingQuantity, e.returnedNow + 1))
+                                                } else e
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, null)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = {
+                            returnEntries = returnEntries.map { e ->
+                                e.copy(returnedNow = e.pendingQuantity)
+                            }
+                        }
+                    ) {
+                        Text("Mark All")
+                    }
+                    Button(
+                        onClick = {
+                            val returnMap = returnEntries
+                                .filter { it.returnedNow > 0 }
+                                .associate { it.orderItemId to it.returnedNow }
+                            
+                            if (returnMap.isNotEmpty()) {
+                                viewModel.recordReturn(returnMap) {
+                                    android.widget.Toast.makeText(context, "Return recorded successfully", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            showRecordReturnDialog = false
+                        },
+                        enabled = returnEntries.any { it.returnedNow > 0 }
+                    ) {
+                        Text("Save Return")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRecordReturnDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -336,3 +488,13 @@ private fun PaymentDialog(maxAmount: Double, onDismiss: () -> Unit, onConfirm: (
         }
     )
 }
+
+
+data class LocalReturnEntry(
+    val orderItemId: Long,
+    val itemName: String,
+    val quantity: Int,
+    val alreadyReturned: Int,
+    val pendingQuantity: Int,
+    val returnedNow: Int
+)
