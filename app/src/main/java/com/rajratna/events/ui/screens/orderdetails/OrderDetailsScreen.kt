@@ -34,6 +34,8 @@ fun OrderDetailsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showPaymentDialog by remember { mutableStateOf(false) }
+    var showCancelConfirm by remember { mutableStateOf(false) }
+    var showDeliverConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(orderId) { viewModel.loadOrder(orderId) }
 
@@ -77,28 +79,35 @@ fun OrderDetailsScreen(
                 }
                 // Customer info
                 item {
-                    Card(shape = RoundedCornerShape(14.dp)) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("👤 Customer", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(8.dp))
-                            Text(order.customerName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(Modifier.padding(20.dp)) {
+                            Text("👤 Customer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(12.dp))
+                            Text(order.customerName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text(order.customerMobile, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            if (order.customerAddress.isNotBlank()) Text(order.customerAddress, style = MaterialTheme.typography.bodySmall)
-                            Spacer(Modifier.height(8.dp))
+                            if (order.customerAddress.isNotBlank()) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(order.customerAddress, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Spacer(Modifier.height(16.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 FilledTonalButton(onClick = { WhatsAppUtils.callCustomer(context, order.customerMobile) }) {
-                                    Icon(Icons.Default.Call, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Call")
+                                    Icon(Icons.Default.Call, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Call")
                                 }
                                 FilledTonalButton(onClick = {
                                     WhatsAppUtils.shareOnWhatsApp(context, order.customerMobile, WhatsAppUtils.generateBillMessage(order, state.orderItems))
                                 }) {
-                                    Icon(Icons.Default.Share, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Bill")
+                                    Icon(Icons.Default.Share, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Bill")
                                 }
                                 if (order.balanceAmount > 0) {
                                     FilledTonalButton(onClick = {
                                         WhatsAppUtils.shareOnWhatsApp(context, order.customerMobile, WhatsAppUtils.generatePaymentReminder(order))
                                     }) {
-                                        Icon(Icons.Default.NotificationsActive, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Remind")
+                                        Icon(Icons.Default.NotificationsActive, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Remind")
                                     }
                                 }
                             }
@@ -107,45 +116,58 @@ fun OrderDetailsScreen(
                 }
                 // Dates
                 item {
-                    Card(shape = RoundedCornerShape(14.dp)) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("📅 Dates", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(8.dp))
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(Modifier.padding(20.dp)) {
+                            Text("📅 Dates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(12.dp))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Column { Text("Order", style = MaterialTheme.typography.labelSmall); Text(DateUtils.formatDate(order.orderDate)) }
-                                Column { Text("Delivery", style = MaterialTheme.typography.labelSmall); Text(DateUtils.formatDate(order.deliveryDate)) }
-                                Column { Text("Return", style = MaterialTheme.typography.labelSmall); Text(DateUtils.formatDate(order.returnDate)) }
+                                Column { Text("Order", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(DateUtils.formatDate(order.orderDate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium) }
+                                Column { Text("Delivery", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(DateUtils.formatDate(order.deliveryDate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium) }
+                                Column { Text("Return", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(DateUtils.formatDate(order.returnDate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium) }
                             }
-                            Spacer(Modifier.height(4.dp))
-                            Text("Rental Days: ${order.rentalDays}", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                            if (order.notes.isNotBlank()) { Spacer(Modifier.height(4.dp)); Text("Notes: ${order.notes}", style = MaterialTheme.typography.bodySmall) }
+                            Spacer(Modifier.height(12.dp))
+                            Text("Rental Days: ${order.rentalDays}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            if (order.notes.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text("Notes: ${order.notes}", style = MaterialTheme.typography.bodyMedium) }
                         }
                     }
                 }
                 // Items
                 item {
-                    Card(shape = RoundedCornerShape(14.dp)) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("📦 Items", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(8.dp))
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(Modifier.padding(20.dp)) {
+                            Text("📦 Items", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(12.dp))
                             state.orderItems.forEach { item ->
+                                val displayName = if (item.isCustomerOwned) "${item.itemName} (Customer Jar)" else item.itemName
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("${item.itemName} (${item.quantity} × ${item.ratePerDay.toInt()} × ${item.rentalDays}d)")
-                                    Text(item.totalAmount.toRupee(), fontWeight = FontWeight.SemiBold)
+                                    Text("$displayName (${item.quantity} × ${item.ratePerDay.toInt()} × ${item.rentalDays}d)", style = MaterialTheme.typography.bodyMedium)
+                                    Text(item.totalAmount.toRupee(), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                                 }
-                                Spacer(Modifier.height(4.dp))
+                                Spacer(Modifier.height(8.dp))
                             }
                         }
                     }
                 }
                 // Bill Summary
                 item {
-                    Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("💰 Bill Summary", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("💰 Bill Summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             AmountRow("Items Total", order.itemsTotal)
                             if (order.transportRent > 0) AmountRow("Transport Rent", order.transportRent)
-                            HorizontalDivider()
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             AmountRow("Grand Total", order.grandTotal, isBold = true, color = MaterialTheme.colorScheme.primary)
                             AmountRow("Paid", order.grandTotal - order.balanceAmount, color = StatusCompleted)
                             AmountRow("Balance", order.balanceAmount, isBold = true, color = if (order.balanceAmount > 0) MaterialTheme.colorScheme.error else StatusCompleted)
@@ -154,15 +176,20 @@ fun OrderDetailsScreen(
                 }
                 // Payments history
                 if (state.payments.isNotEmpty()) {
-                    item { Text("💳 Payment History", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp)) }
+                    item { Text("💳 Payment History", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 4.dp)) }
                     items(state.payments) { payment ->
-                        Card(shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
-                            Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Row(Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Column {
-                                    Text(DateUtils.formatDate(payment.paymentDate), style = MaterialTheme.typography.bodySmall)
-                                    Text(payment.paymentMethod, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(DateUtils.formatDate(payment.paymentDate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                    Text(payment.paymentMethod, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                Text(payment.amount.toRupee(), fontWeight = FontWeight.Bold, color = StatusCompleted)
+                                Text(payment.amount.toRupee(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = StatusCompleted)
                             }
                         }
                     }
@@ -183,9 +210,23 @@ fun OrderDetailsScreen(
                         }
                         statusActions.forEach { (status, label) ->
                             OutlinedButton(onClick = {
-                                viewModel.updateStatus(status)
-                                if (status == OrderStatus.CONFIRMED) {
-                                    WhatsAppUtils.shareOnWhatsApp(context, order.customerMobile, WhatsAppUtils.generateOrderConfirmation(order))
+                                when (status) {
+                                    OrderStatus.CANCELLED -> showCancelConfirm = true
+                                    OrderStatus.DELIVERED -> showDeliverConfirm = true
+                                    OrderStatus.CONFIRMED -> {
+                                        viewModel.updateStatus(status) {
+                                            android.widget.Toast.makeText(context, "Order Confirmed successfully", android.widget.Toast.LENGTH_SHORT).show()
+                                            WhatsAppUtils.shareOnWhatsApp(context, order.customerMobile, WhatsAppUtils.generateOrderConfirmation(order))
+                                        }
+                                    }
+                                    OrderStatus.COMPLETED -> {
+                                        viewModel.updateStatus(status) {
+                                            android.widget.Toast.makeText(context, "Order completed successfully", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    else -> {
+                                        viewModel.updateStatus(status) {}
+                                    }
                                 }
                             }, Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) {
                                 Text(label)
@@ -204,8 +245,63 @@ fun OrderDetailsScreen(
             maxAmount = order.balanceAmount,
             onDismiss = { showPaymentDialog = false },
             onConfirm = { amount, method, notes ->
-                viewModel.recordPayment(amount, method, notes)
+                viewModel.recordPayment(amount, method, notes) {
+                    android.widget.Toast.makeText(context, "Payment recorded successfully", android.widget.Toast.LENGTH_SHORT).show()
+                }
                 showPaymentDialog = false
+            }
+        )
+    }
+
+    // Confirm Cancellation Dialog
+    if (showCancelConfirm && order != null) {
+        AlertDialog(
+            onDismissRequest = { showCancelConfirm = false },
+            title = { Text("Cancel Order?") },
+            text = { Text("Are you sure you want to cancel this order? Cancelled orders will not count in stock or income.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCancelConfirm = false
+                        viewModel.updateStatus(OrderStatus.CANCELLED) {
+                            android.widget.Toast.makeText(context, "Order cancelled successfully", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Cancel Order")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelConfirm = false }) {
+                    Text("No")
+                }
+            }
+        )
+    }
+
+    // Confirm Delivery Dialog
+    if (showDeliverConfirm && order != null) {
+        AlertDialog(
+            onDismissRequest = { showDeliverConfirm = false },
+            title = { Text("Mark as Delivered?") },
+            text = { Text("This means items have been sent to customer and will affect stock/returns.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeliverConfirm = false
+                        viewModel.updateStatus(OrderStatus.DELIVERED) {
+                            android.widget.Toast.makeText(context, "Order marked as delivered", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text("Mark Delivered")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeliverConfirm = false }) {
+                    Text("No")
+                }
             }
         )
     }

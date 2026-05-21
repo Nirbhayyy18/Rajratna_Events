@@ -87,7 +87,7 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
             // Load pending returns
             val pendingOrders = repository.getOrdersWithPendingReturns()
             val pendingReturnOrders = pendingOrders.map { order ->
-                val items = repository.getOrderItemsList(order.id)
+                val items = repository.getOrderItemsList(order.id).filter { !it.isCustomerOwned }
                 PendingReturnOrder(
                     order = order,
                     items = items,
@@ -100,7 +100,7 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
             // Load returned orders
             val returnedOrders = repository.getReturnedOrders()
             val returnedOrderModels = returnedOrders.map { order ->
-                val items = repository.getOrderItemsList(order.id)
+                val items = repository.getOrderItemsList(order.id).filter { !it.isCustomerOwned }
                 val fullyReturned = items.all { it.quantity <= it.returnedQuantity }
                 ReturnedOrder(
                     order = order,
@@ -171,7 +171,7 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val items = repository.getOrderItemsList(orderId)
             val entries = items
-                .filter { it.quantity > it.returnedQuantity }
+                .filter { !it.isCustomerOwned && it.quantity > it.returnedQuantity }
                 .map { item ->
                     ReturnEntry(
                         orderItemId = item.id,
@@ -214,7 +214,7 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
         _state.value = _state.value.copy(returnEntries = entries)
     }
 
-    fun saveReturn() {
+    fun saveReturn(onSuccess: () -> Unit) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isSaving = true)
 
@@ -229,6 +229,7 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
             _state.value = _state.value.copy(isSaving = false)
             closeRecordReturn()
             loadData()
+            onSuccess()
         }
     }
 }

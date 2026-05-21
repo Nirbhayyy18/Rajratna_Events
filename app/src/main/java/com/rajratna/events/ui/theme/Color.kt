@@ -3,38 +3,37 @@ package com.rajratna.events.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ═══════════════════════════════════════════════════════════
-// Primary Brand Colors - Deep Orange / Warm Event Theme
+// Primary Brand Colors - Professional Teal
+// ═══════════════════════════════════════════════════════════
+
+val Teal80 = Color(0xFF4DB6AC)
+val Teal40 = Color(0xFF00695C)
+val TealContainer = Color(0xFFE0F2F1)
+val OnTealContainer = Color(0xFF003D33)
+
+// ═══════════════════════════════════════════════════════════
+// Secondary Colors - Amber/Orange for highlights
 // ═══════════════════════════════════════════════════════════
 
 val Orange80 = Color(0xFFFFB74D)
-val Orange60 = Color(0xFFFF9800)
 val Orange40 = Color(0xFFE65100)
 val OrangeContainer = Color(0xFFFFF3E0)
-val OnOrangeContainer = Color(0xFF3E2723)
 
 // ═══════════════════════════════════════════════════════════
-// Secondary Colors - Teal Accent
+// Tertiary Colors - Slate Gray
 // ═══════════════════════════════════════════════════════════
 
-val Teal80 = Color(0xFF80CBC4)
-val Teal40 = Color(0xFF00897B)
-val TealContainer = Color(0xFFE0F2F1)
-
-// ═══════════════════════════════════════════════════════════
-// Tertiary Colors - Warm Brown
-// ═══════════════════════════════════════════════════════════
-
-val Brown80 = Color(0xFFBCAAA4)
-val Brown40 = Color(0xFF5D4037)
+val Slate80 = Color(0xFFB0BEC5)
+val Slate40 = Color(0xFF455A64)
 
 // ═══════════════════════════════════════════════════════════
 // Surface / Background
 // ═══════════════════════════════════════════════════════════
 
-val SurfaceLight = Color(0xFFFFFBF8)
-val SurfaceDark = Color(0xFF1A1110)
-val SurfaceContainerLight = Color(0xFFF5EDE8)
-val SurfaceContainerDark = Color(0xFF2D2220)
+val SurfaceLight = Color(0xFFF8F9FA)
+val SurfaceDark = Color(0xFF121212)
+val SurfaceContainerLight = Color(0xFFFFFFFF)
+val SurfaceContainerDark = Color(0xFF1E1E1E)
 
 // ═══════════════════════════════════════════════════════════
 // Status Colors - Used for Order & Payment Status Chips

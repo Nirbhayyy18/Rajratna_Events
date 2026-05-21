@@ -54,10 +54,15 @@ fun PaymentsScreen(
                 item { EmptyState(Icons.Default.Payment, "No payments yet", "Payments will appear here when recorded") }
             } else {
                 items(state.payments, key = { it.id }) { payment ->
-                    Card(onClick = { onNavigateToOrder(payment.orderId) }, shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp)) {
-                        Row(Modifier.padding(14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Card(
+                        onClick = { onNavigateToOrder(payment.orderId) },
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(2.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Row(Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column {
-                                Text(payment.customerName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                Text(payment.customerName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 Text("Bill #${payment.orderId} • ${payment.paymentMethod}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(DateUtils.formatDate(payment.paymentDate), style = MaterialTheme.typography.labelSmall)
                                 if (payment.notes.isNotBlank()) Text(payment.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)

@@ -106,6 +106,200 @@ class AppRepository(
     suspend fun getFirstOrderItem(orderId: Long) =
         orderDao.getFirstOrderItem(orderId)
 
+    // ── Date-Wise Stock ─────────────────────────────────────
+
+    suspend fun getAllOrdersList(): List<Order> = orderDao.getAllOrdersList()
+    suspend fun getAllOrderItemsList(): List<OrderItem> = orderDao.getAllOrderItemsList()
+
+    suspend fun getStockDetailsForDate(
+        selectedDate: Long,
+        excludeOrderId: Long? = null
+    ): List<StockDetails> {
+        val items = itemDao.getAllItemsList().filter { it.isActive }
+        val activeOrders = orderDao.getAllOrdersList().filter { it.orderStatus == OrderStatus.CONFIRMED || it.orderStatus == OrderStatus.DELIVERED }
+        val allOrderItems = orderDao.getAllOrderItemsList().filter { !it.isCustomerOwned }
+        val itemsByOrder = allOrderItems.groupBy { it.orderId }
+
+        val today = com.rajratna.events.util.DateUtils.startOfToday()
+        val isToday = selectedDate == today
+
+        return items.map { item ->
+            if (isToday) {
+                var physicalOut = 0
+                activeOrders.forEach { order ->
+                    val orderDeliveryStart = com.rajratna.events.util.DateUtils.startOfDay(order.deliveryDate)
+                    if (order.id != excludeOrderId && orderDeliveryStart <= today) {
+                        val orderItems = itemsByOrder[order.id] ?: emptyList()
+                        val match = orderItems.find { it.itemId == item.id }
+                        if (match != null) {
+                            val pending = match.quantity - match.returnedQuantity
+                            if (pending > 0) {
+                                physicalOut += pending
+                            }
+                        }
+                    }
+                }
+                val available = maxOf(0, item.totalStock - physicalOut)
+                StockDetails(
+                    itemId = item.id,
+                    totalStock = item.totalStock,
+                    outQty = physicalOut,
+                    availableQty = available,
+                    riskQty = 0
+                )
+            } else {
+                var scheduledOut = 0
+                var risk = 0
+                activeOrders.forEach { order ->
+                    if (order.id != excludeOrderId) {
+                        val orderItems = itemsByOrder[order.id] ?: emptyList()
+                        val match = orderItems.find { it.itemId == item.id }
+                        if (match != null) {
+                            val pending = match.quantity - match.returnedQuantity
+                            if (pending > 0) {
+                                val orderDeliveryStart = com.rajratna.events.util.DateUtils.startOfDay(order.deliveryDate)
+                                val orderReturnStart = com.rajratna.events.util.DateUtils.startOfDay(order.returnDate)
+                                if (orderDeliveryStart <= selectedDate && selectedDate <= orderReturnStart) {
+                                    scheduledOut += pending
+                                } else if (orderDeliveryStart < selectedDate && orderReturnStart < selectedDate) {
+                                    risk += pending
+                                }
+                            }
+                        }
+                    }
+                }
+                val expectedAvailable = maxOf(0, item.totalStock - scheduledOut)
+                StockDetails(
+                    itemId = item.id,
+                    totalStock = item.totalStock,
+                    outQty = scheduledOut,
+                    availableQty = expectedAvailable,
+                    riskQty = risk
+                )
+            }
+        }
+    }
+
+    suspend fun getStockDetailsForRange(
+        deliveryDate: Long,
+        returnDate: Long,
+        excludeOrderId: Long? = null
+    ): Map<Long, StockDetails> {
+        val days = getDaysInRange(deliveryDate, returnDate)
+        if (days.isEmpty()) return emptyMap()
+
+        val items = itemDao.getAllItemsList().filter { it.isActive }
+        val activeOrders = orderDao.getAllOrdersList().filter { it.orderStatus == OrderStatus.CONFIRMED || it.orderStatus == OrderStatus.DELIVERED }
+        val allOrderItems = orderDao.getAllOrderItemsList().filter { !it.isCustomerOwned }
+        val itemsByOrder = allOrderItems.groupBy { it.orderId }
+
+        val today = com.rajratna.events.util.DateUtils.startOfToday()
+
+        return items.associate { item ->
+            var minAvailable = Int.MAX_VALUE
+            var riskOnDelivery = 0
+            var outOnDelivery = 0
+
+            days.forEachIndexed { index, day ->
+                val isToday = day == today
+                var outQty = 0
+                var riskQty = 0
+
+                activeOrders.forEach { order ->
+                    if (order.id != excludeOrderId) {
+                        val orderItems = itemsByOrder[order.id] ?: emptyList()
+                        val match = orderItems.find { it.itemId == item.id }
+                        if (match != null) {
+                            val pending = match.quantity - match.returnedQuantity
+                            if (pending > 0) {
+                                val orderDeliveryStart = com.rajratna.events.util.DateUtils.startOfDay(order.deliveryDate)
+                                val orderReturnStart = com.rajratna.events.util.DateUtils.startOfDay(order.returnDate)
+                                if (isToday) {
+                                    if (orderDeliveryStart <= today) {
+                                        outQty += pending
+                                    }
+                                } else {
+                                    if (orderDeliveryStart <= day && day <= orderReturnStart) {
+                                        outQty += pending
+                                    } else if (orderDeliveryStart < day && orderReturnStart < day) {
+                                        riskQty += pending
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                val available = maxOf(0, item.totalStock - outQty)
+                if (available < minAvailable) {
+                    minAvailable = available
+                }
+                if (index == 0) {
+                    riskOnDelivery = riskQty
+                    outOnDelivery = outQty
+                }
+            }
+
+            item.id to StockDetails(
+                itemId = item.id,
+                totalStock = item.totalStock,
+                outQty = outOnDelivery,
+                availableQty = if (minAvailable == Int.MAX_VALUE) item.totalStock else minAvailable,
+                riskQty = riskOnDelivery
+            )
+        }
+    }
+
+    private fun getDaysInRange(startDate: Long, endDate: Long): List<Long> {
+        val days = mutableListOf<Long>()
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = startDate
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+
+        val endCal = java.util.Calendar.getInstance()
+        endCal.timeInMillis = endDate
+        endCal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        endCal.set(java.util.Calendar.MINUTE, 0)
+        endCal.set(java.util.Calendar.SECOND, 0)
+        endCal.set(java.util.Calendar.MILLISECOND, 0)
+
+        val start = cal.timeInMillis
+        val end = endCal.timeInMillis
+        if (start > end) {
+            return listOf(start)
+        }
+
+        while (cal.timeInMillis <= endCal.timeInMillis) {
+            days.add(cal.timeInMillis)
+            cal.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }
+        return days
+    }
+
+    suspend fun getAvailableOnDate(
+        selectedDate: Long,
+        excludeOrderId: Long? = null
+    ): Map<Long, Int> {
+        return getStockDetailsForDate(selectedDate, excludeOrderId).associate { it.itemId to it.availableQty }
+    }
+
+    suspend fun getDateWiseRentedQuantities(selectedDate: Long) =
+        orderDao.getDateWiseRentedQuantities(selectedDate)
+
+    // ── Reports ─────────────────────────────────────────────
+
+    suspend fun getItemWiseIncome(start: Long, end: Long) =
+        orderDao.getItemWiseIncome(start, end)
+    suspend fun getTotalIncomeByDelivery(start: Long, end: Long) =
+        orderDao.getTotalIncomeByDelivery(start, end)
+    suspend fun getOrderCountByDelivery(start: Long, end: Long) =
+        orderDao.getOrderCountByDelivery(start, end)
+    suspend fun getPendingBalanceByDelivery(start: Long, end: Long) =
+        orderDao.getPendingBalanceByDelivery(start, end)
+
     // ══════════════════════════════════════════════════════════
     // RETURNS
     // ══════════════════════════════════════════════════════════
@@ -192,6 +386,14 @@ class AppRepository(
         data.payments.forEach { paymentDao.insertPayment(it) }
     }
 }
+
+data class StockDetails(
+    val itemId: Long,
+    val totalStock: Int,
+    val outQty: Int,
+    val availableQty: Int,
+    val riskQty: Int
+)
 
 /**
  * Container for all app data, used in backup/restore.

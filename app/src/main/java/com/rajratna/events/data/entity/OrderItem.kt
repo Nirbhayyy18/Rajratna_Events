@@ -31,5 +31,6 @@ data class OrderItem(
     val ratePerDay: Double,
     val rentalDays: Int,
     val totalAmount: Double,
-    val returnedQuantity: Int = 0
+    val returnedQuantity: Int = 0,
+    val isCustomerOwned: Boolean = false
 )

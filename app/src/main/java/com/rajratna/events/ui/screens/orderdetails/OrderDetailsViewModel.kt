@@ -50,13 +50,14 @@ class OrderDetailsViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun updateStatus(status: String) {
+    fun updateStatus(status: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             repository.updateOrderStatus(currentOrderId, status)
+            onSuccess()
         }
     }
 
-    fun recordPayment(amount: Double, method: String, notes: String) {
+    fun recordPayment(amount: Double, method: String, notes: String, onSuccess: () -> Unit) {
         val order = _state.value.order ?: return
         viewModelScope.launch {
             val payment = Payment(
@@ -69,6 +70,7 @@ class OrderDetailsViewModel(application: Application) : AndroidViewModel(applica
                 notes = notes
             )
             repository.recordPayment(payment)
+            onSuccess()
         }
     }
 }

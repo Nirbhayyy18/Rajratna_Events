@@ -36,6 +36,7 @@ fun NewOrderScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var lastActionStatus by remember { mutableStateOf<String?>(null) }
 
     // Load order for editing
     LaunchedEffect(editOrderId) {
@@ -47,6 +48,14 @@ fun NewOrderScreen(
     // Navigate on successful save
     LaunchedEffect(state.savedOrderId) {
         state.savedOrderId?.let { orderId ->
+            val message = if (state.isEditMode) {
+                "Order updated successfully"
+            } else if (lastActionStatus == OrderStatus.PENDING) {
+                "Order Saved as Pending"
+            } else {
+                "Order Confirmed successfully"
+            }
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
             onOrderSaved(orderId)
         }
     }
@@ -204,13 +213,34 @@ fun NewOrderScreen(
                 // ── Items Selection ─────────────────────────
                 item {
                     SectionCard(title = "📦 Items") {
+                        if (state.isCheckingStock) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(4.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Checking stock...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                         state.itemEntries.forEach { entry ->
+                            val stockDetails = state.rangeStockDetails[entry.item.id]
+                            val available = stockDetails?.availableQty ?: entry.item.totalStock
+                            val risk = stockDetails?.riskQty ?: 0
+
                             ItemQuantityRow(
                                 name = entry.item.name,
                                 rate = entry.item.ratePerDay,
                                 quantity = entry.quantity,
                                 rentalDays = state.rentalDays,
-                                onQuantityChange = { viewModel.updateItemQuantity(entry.item.id, it) }
+                                deliveryDate = state.deliveryDate,
+                                isCustomerOwned = entry.isCustomerOwned,
+                                availableForDates = available,
+                                riskStock = risk,
+                                stockError = state.stockErrors[entry.item.id],
+                                onQuantityChange = { viewModel.updateItemQuantity(entry.item.id, it) },
+                                onCustomerOwnedChange = { viewModel.updateItemCustomerOwned(entry.item.id, it) }
                             )
                             if (entry != state.itemEntries.last()) {
                                 HorizontalDivider(
@@ -272,12 +302,15 @@ fun NewOrderScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
-                            onClick = { viewModel.saveOrder(OrderStatus.CONFIRMED) },
+                            onClick = {
+                                lastActionStatus = OrderStatus.CONFIRMED
+                                viewModel.saveOrder(OrderStatus.CONFIRMED)
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
                             shape = RoundedCornerShape(14.dp),
-                            enabled = !state.isSaving
+                            enabled = !state.isSaving && state.isStockValid
                         ) {
                             if (state.isSaving) {
                                 CircularProgressIndicator(
@@ -297,16 +330,46 @@ fun NewOrderScreen(
 
                         if (!state.isEditMode) {
                             OutlinedButton(
-                                onClick = { viewModel.saveOrder(OrderStatus.PENDING) },
+                                onClick = {
+                                    lastActionStatus = OrderStatus.PENDING
+                                    viewModel.saveOrder(OrderStatus.PENDING)
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(52.dp),
                                 shape = RoundedCornerShape(14.dp),
-                                enabled = !state.isSaving
+                                enabled = !state.isSaving && state.isStockValid
                             ) {
                                 Icon(Icons.Default.AccessTime, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
                                 Text("Save as Pending", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+
+                        if (!state.isStockValid) {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "Stock not available for selected dates. Reduce quantity or change dates.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
                             }
                         }
                     }
@@ -332,27 +395,35 @@ private fun SectionCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 12.dp)
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 16.dp)
             )
             content()
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ItemQuantityRow(
     name: String,
     rate: Double,
     quantity: Int,
     rentalDays: Int,
-    onQuantityChange: (Int) -> Unit
+    deliveryDate: Long,
+    isCustomerOwned: Boolean = false,
+    availableForDates: Int? = null,
+    riskStock: Int = 0,
+    stockError: String? = null,
+    onQuantityChange: (Int) -> Unit,
+    onCustomerOwnedChange: (Boolean) -> Unit
 ) {
     var quantityText by remember { mutableStateOf(quantity.toString()) }
 
@@ -364,89 +435,142 @@ private fun ItemQuantityRow(
         }
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = "₹${rate.toInt()} / day",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (quantity > 0) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "$quantity × ${rate.toInt()} × $rentalDays = ${(quantity * rate * rentalDays).toRupee()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    text = name,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "₹${rate.toInt()} / day",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (!isCustomerOwned && availableForDates != null) {
+                    Text(
+                        text = "Available for selected dates: $availableForDates",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Teal40,
+                        fontWeight = FontWeight.Medium
+                    )
+                    if (riskStock > 0) {
+                        Text(
+                            text = "Risk: $riskStock pending return before this date",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+                if (quantity > 0) {
+                    Text(
+                        text = "$quantity × ${rate.toInt()} × $rentalDays = ${(quantity * rate * rentalDays).toRupee()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                FilledIconButton(
+                    onClick = { onQuantityChange(quantity - 1) },
+                    modifier = Modifier.size(36.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(18.dp))
+                }
+
+                OutlinedTextField(
+                    value = quantityText,
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() }) {
+                            val normalizedInput = input.trimStart('0').ifEmpty {
+                                if (input.isEmpty()) "" else "0"
+                            }
+                            val parsedQuantity = normalizedInput
+                                .toLongOrNull()
+                                ?.coerceAtMost(Int.MAX_VALUE.toLong())
+                                ?.toInt()
+                                ?: 0
+
+                            quantityText = normalizedInput
+                            onQuantityChange(parsedQuantity)
+                        }
+                    },
+                    modifier = Modifier.width(72.dp),
+                    singleLine = true,
+                    isError = stockError != null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    textStyle = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    ),
+                    placeholder = {
+                        Text(
+                            text = "0",
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    },
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                FilledIconButton(
+                    onClick = { onQuantityChange(quantity + 1) },
+                    modifier = Modifier.size(36.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+
+        if (name.contains("Water Jar", ignoreCase = true) && quantity > 0) {
+            Spacer(Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Source:",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium
+                )
+                FilterChip(
+                    selected = !isCustomerOwned,
+                    onClick = { onCustomerOwnedChange(false) },
+                    label = { Text("Our Jar") }
+                )
+                FilterChip(
+                    selected = isCustomerOwned,
+                    onClick = { onCustomerOwnedChange(true) },
+                    label = { Text("Customer Jar") }
                 )
             }
         }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            FilledIconButton(
-                onClick = { onQuantityChange(quantity - 1) },
-                modifier = Modifier.size(36.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(18.dp))
-            }
-
-            OutlinedTextField(
-                value = quantityText,
-                onValueChange = { input ->
-                    if (input.all { it.isDigit() }) {
-                        val normalizedInput = input.trimStart('0').ifEmpty {
-                            if (input.isEmpty()) "" else "0"
-                        }
-                        val parsedQuantity = normalizedInput
-                            .toLongOrNull()
-                            ?.coerceAtMost(Int.MAX_VALUE.toLong())
-                            ?.toInt()
-                            ?: 0
-
-                        quantityText = normalizedInput
-                        onQuantityChange(parsedQuantity)
-                    }
-                },
-                modifier = Modifier.width(72.dp),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                textStyle = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                ),
-                placeholder = {
-                    Text(
-                        text = "0",
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                },
-                shape = RoundedCornerShape(10.dp)
+        // Stock error message
+        if (stockError != null) {
+            Text(
+                text = stockError,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 4.dp)
             )
-
-            FilledIconButton(
-                onClick = { onQuantityChange(quantity + 1) },
-                modifier = Modifier.size(36.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(18.dp))
-            }
         }
     }
 }
@@ -477,9 +601,10 @@ private fun DateField(
             ).show()
         },
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,

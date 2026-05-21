@@ -5,13 +5,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rajratna.events.RajratnaApp
 import com.rajratna.events.data.entity.*
+import com.rajratna.events.data.repository.StockDetails
 import com.rajratna.events.util.DateUtils
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class ItemEntry(
     val item: Item,
-    val quantity: Int = 0
+    val quantity: Int = 0,
+    val isCustomerOwned: Boolean = false
 )
 
 data class NewOrderState(
@@ -37,6 +40,12 @@ data class NewOrderState(
     val grandTotal: Double = 0.0,
     val advancePaid: String = "",
     val balanceAmount: Double = 0.0,
+    // Stock validation
+    val availableStock: Map<Long, Int> = emptyMap(),
+    val rangeStockDetails: Map<Long, StockDetails> = emptyMap(),
+    val stockErrors: Map<Long, String> = emptyMap(),
+    val isStockValid: Boolean = true,
+    val isCheckingStock: Boolean = false,
     // Result
     val savedOrderId: Long? = null,
     val errorMessage: String? = null
@@ -49,6 +58,8 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     private val _state = MutableStateFlow(NewOrderState())
     val state: StateFlow<NewOrderState> = _state.asStateFlow()
 
+    private var stockCheckJob: Job? = null
+
     init {
         loadItems()
     }
@@ -59,6 +70,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                 _state.value = _state.value.copy(
                     itemEntries = items.map { ItemEntry(it) }
                 )
+                checkStockAvailability()
             }
         }
     }
@@ -76,14 +88,19 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
             repository.getActiveItems().first().let { activeItems ->
                 val entries = activeItems.map { item ->
                     val savedItem = orderItems.find { it.itemId == item.id }
-                    ItemEntry(item, savedItem?.quantity ?: 0)
+                    ItemEntry(
+                        item = item,
+                        quantity = savedItem?.quantity ?: 0,
+                        isCustomerOwned = savedItem?.isCustomerOwned ?: false
+                    )
                 }
                 // Also include items that were in the order but may now be inactive
                 val missingItems = orderItems.filter { oi -> entries.none { it.item.id == oi.itemId } }
                 val extraEntries = missingItems.map { oi ->
                     ItemEntry(
                         item = Item(id = oi.itemId, name = oi.itemName, ratePerDay = oi.ratePerDay),
-                        quantity = oi.quantity
+                        quantity = oi.quantity,
+                        isCustomerOwned = oi.isCustomerOwned
                     )
                 }
 
@@ -104,6 +121,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                     advancePaid = if (order.advancePaid > 0) order.advancePaid.toInt().toString() else ""
                 )
                 recalculate()
+                checkStockAvailability()
             }
         }
     }
@@ -125,11 +143,13 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     fun updateDeliveryDate(date: Long) {
         _state.value = _state.value.copy(deliveryDate = date)
         recalculateDays()
+        checkStockAvailability()
     }
 
     fun updateReturnDate(date: Long) {
         _state.value = _state.value.copy(returnDate = date)
         recalculateDays()
+        checkStockAvailability()
     }
 
     fun updateNotes(notes: String) {
@@ -142,6 +162,16 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         }
         _state.value = _state.value.copy(itemEntries = entries)
         recalculate()
+        validateStockLocally()
+    }
+
+    fun updateItemCustomerOwned(itemId: Long, isCustomerOwned: Boolean) {
+        val entries = _state.value.itemEntries.map {
+            if (it.item.id == itemId) it.copy(isCustomerOwned = isCustomerOwned) else it
+        }
+        _state.value = _state.value.copy(itemEntries = entries)
+        recalculate()
+        validateStockLocally()
     }
 
     fun updateTransportRent(rent: String) {
@@ -180,6 +210,53 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
+    // ── Stock Validation ────────────────────────────────────
+
+    /**
+     * Check stock availability for the selected date range.
+     * Queries the database for min available across all days in range.
+     */
+    private fun checkStockAvailability() {
+        stockCheckJob?.cancel()
+        stockCheckJob = viewModelScope.launch {
+            _state.value = _state.value.copy(isCheckingStock = true)
+            val s = _state.value
+            val details = repository.getStockDetailsForRange(
+                deliveryDate = s.deliveryDate,
+                returnDate = s.returnDate,
+                excludeOrderId = s.editOrderId
+            )
+            _state.value = _state.value.copy(
+                rangeStockDetails = details,
+                isCheckingStock = false
+            )
+            validateStockLocally()
+        }
+    }
+
+    /**
+     * Validate entered quantities against available stock (no DB call).
+     */
+    private fun validateStockLocally() {
+        val s = _state.value
+        val errors = mutableMapOf<Long, String>()
+
+        for (entry in s.itemEntries) {
+            if (entry.quantity <= 0) continue
+            if (entry.isCustomerOwned) continue
+
+            val details = s.rangeStockDetails[entry.item.id]
+            if (details != null && entry.quantity > details.availableQty) {
+                errors[entry.item.id] = "Only ${details.availableQty} available for selected dates"
+            }
+        }
+
+        _state.value = s.copy(
+            stockErrors = errors,
+            isStockValid = errors.isEmpty()
+        )
+    }
+
     // ── Save Order ──────────────────────────────────────────
 
     fun saveOrder(status: String = OrderStatus.PENDING) {
@@ -196,6 +273,10 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         }
         if (s.itemEntries.none { it.quantity > 0 }) {
             _state.value = s.copy(errorMessage = "At least one item must be selected")
+            return
+        }
+        if (!s.isStockValid) {
+            _state.value = s.copy(errorMessage = "Fix stock errors before saving")
             return
         }
 
@@ -255,7 +336,8 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                         quantity = entry.quantity,
                         ratePerDay = entry.item.ratePerDay,
                         rentalDays = s.rentalDays,
-                        totalAmount = entry.quantity * entry.item.ratePerDay * s.rentalDays
+                        totalAmount = entry.quantity * entry.item.ratePerDay * s.rentalDays,
+                        isCustomerOwned = entry.isCustomerOwned
                     )
                 }
 

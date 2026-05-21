@@ -29,7 +29,8 @@ object WhatsAppUtils {
         sb.appendLine("Items:")
 
         items.forEach { item ->
-            sb.appendLine("${item.itemName}: ${item.quantity} x ${item.ratePerDay.toInt()} x ${item.rentalDays} days = ${item.totalAmount.toInt()}")
+            val suffix = if (item.isCustomerOwned) " (Customer Jar)" else ""
+            sb.appendLine("${item.itemName}$suffix: ${item.quantity} x ${item.ratePerDay.toInt()} x ${item.rentalDays} days = ${item.totalAmount.toInt()}")
         }
 
         sb.appendLine()

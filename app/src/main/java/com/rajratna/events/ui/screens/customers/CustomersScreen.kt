@@ -55,12 +55,18 @@ fun CustomersScreen(
             } else {
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(state.customers, key = { it.customer.id }) { cs ->
-                        Card(onClick = { onNavigateToCustomer(cs.customer.id) }, shape = RoundedCornerShape(14.dp), elevation = CardDefaults.cardElevation(1.dp)) {
-                            Column(Modifier.padding(14.dp)) {
+                        Card(
+                            onClick = { onNavigateToCustomer(cs.customer.id) },
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(2.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(Modifier.padding(16.dp)) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(cs.customer.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                                        Text(cs.customer.mobileNumber, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(cs.customer.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(cs.customer.mobileNumber, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                     Row {
                                         IconButton(onClick = { WhatsAppUtils.callCustomer(context, cs.customer.mobileNumber) }) {
@@ -71,7 +77,9 @@ fun CustomersScreen(
                                         }
                                     }
                                 }
-                                Spacer(Modifier.height(8.dp))
+                                Spacer(Modifier.height(16.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                                Spacer(Modifier.height(12.dp))
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                                     MiniStat("Orders", cs.totalOrders.toString())
                                     MiniStat("Total", cs.totalAmount.toRupee())

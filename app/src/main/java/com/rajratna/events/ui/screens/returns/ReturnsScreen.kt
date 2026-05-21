@@ -115,7 +115,11 @@ fun ReturnsScreen(
             isSaving = state.isSaving,
             onUpdateReturnedNow = { id, value -> viewModel.updateReturnedNow(id, value) },
             onMarkAllReturned = { viewModel.markAllReturned() },
-            onSave = { viewModel.saveReturn() },
+            onSave = {
+                viewModel.saveReturn {
+                    android.widget.Toast.makeText(context, "Return recorded successfully", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            },
             onDismiss = { viewModel.closeRecordReturn() }
         )
     }
@@ -199,13 +203,13 @@ private fun PendingReturnCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Header: Name + Badge
             Row(
@@ -381,13 +385,13 @@ private fun ReturnedCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

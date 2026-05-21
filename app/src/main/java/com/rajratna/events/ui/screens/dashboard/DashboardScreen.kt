@@ -1,5 +1,6 @@
 package com.rajratna.events.ui.screens.dashboard
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,6 +26,7 @@ import com.rajratna.events.ui.theme.*
 import com.rajratna.events.util.DateUtils
 import com.rajratna.events.util.WhatsAppUtils
 import com.rajratna.events.util.toRupee
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,19 +121,85 @@ fun DashboardScreen(
                 }
 
                 // ═══════════════════════════════════════════
-                // C. ITEM-WISE STOCK OVERVIEW
+                // C. ITEM-WISE STOCK OVERVIEW (Date-Aware)
                 // ═══════════════════════════════════════════
                 item {
-                    DashboardSectionTitle(
-                        title = "Stock Overview",
-                        actionIcon = Icons.Outlined.Inventory2,
-                        actionDescription = "Manage Items",
-                        onActionClick = onNavigateToItems
-                    )
+                    val context = LocalContext.current
+                    val isToday = state.selectedStockDate == DateUtils.startOfToday()
+                    val dateLabel = if (isToday) "Today" else DateUtils.formatShortDate(state.selectedStockDate)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Stock Overview",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AssistChip(
+                                onClick = {
+                                    val cal = Calendar.getInstance().apply {
+                                        timeInMillis = state.selectedStockDate
+                                    }
+                                    DatePickerDialog(
+                                        context,
+                                        { _, year, month, day ->
+                                            val selected = Calendar.getInstance()
+                                            selected.set(year, month, day, 0, 0, 0)
+                                            selected.set(Calendar.MILLISECOND, 0)
+                                            viewModel.selectStockDate(selected.timeInMillis)
+                                        },
+                                        cal.get(Calendar.YEAR),
+                                        cal.get(Calendar.MONTH),
+                                        cal.get(Calendar.DAY_OF_MONTH)
+                                    ).show()
+                                },
+                                label = {
+                                    Text(dateLabel, style = MaterialTheme.typography.labelMedium)
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.CalendarMonth,
+                                        contentDescription = "Select Date",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            if (!isToday) {
+                                FilledTonalIconButton(
+                                    onClick = { viewModel.selectStockDate(DateUtils.startOfToday()) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Today,
+                                        contentDescription = "Back to Today",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            IconButton(onClick = onNavigateToItems) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Inventory2,
+                                    contentDescription = "Manage Items",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                 }
 
                 items(state.itemStocks) { itemStock ->
-                    ItemStockCard(itemStock)
+                    ItemStockCard(
+                        item = itemStock,
+                        selectedDate = state.selectedStockDate
+                    )
                 }
 
                 // ═══════════════════════════════════════════
@@ -162,24 +230,23 @@ private fun TodaySummaryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
                 text = "Today's Summary",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 SummaryMetric(
                     label = "Income",
@@ -187,12 +254,14 @@ private fun TodaySummaryCard(
                     valueColor = StatusCompleted,
                     modifier = Modifier.weight(1f)
                 )
+                VerticalDivider(modifier = Modifier.height(40.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 SummaryMetric(
                     label = "Pending",
                     value = pendingPayment.toRupee(),
                     valueColor = if (pendingPayment > 0) PaymentUnpaid else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
+                VerticalDivider(modifier = Modifier.height(40.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 SummaryMetric(
                     label = "Orders",
                     value = orderCount.toString(),
@@ -242,21 +311,21 @@ private fun OrderStatusRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         StatusChipCompact(
             icon = Icons.Default.LocalShipping,
             count = activeCount,
             label = "Active",
-            chipColor = TealContainer,
-            textColor = Teal40,
+            chipColor = MaterialTheme.colorScheme.surface,
+            textColor = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f)
         )
         StatusChipCompact(
             icon = Icons.Default.CheckCircle,
             count = returnedToday,
             label = "Returned",
-            chipColor = StatusCompletedBg,
+            chipColor = MaterialTheme.colorScheme.surface,
             textColor = StatusCompleted,
             modifier = Modifier.weight(1f)
         )
@@ -264,8 +333,8 @@ private fun OrderStatusRow(
             icon = Icons.Default.AccessTime,
             count = pendingReturn,
             label = "Pending",
-            chipColor = PaymentUnpaidBg,
-            textColor = PaymentUnpaid,
+            chipColor = MaterialTheme.colorScheme.surface,
+            textColor = if (pendingReturn > 0) PaymentUnpaid else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
     }
@@ -282,36 +351,37 @@ private fun StatusChipCompact(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = chipColor)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = chipColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+                .padding(vertical = 16.dp, horizontal = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = textColor,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(28.dp)
             )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = "$count",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = textColor
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = textColor,
-                maxLines = 1
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
         }
     }
 }
@@ -354,50 +424,118 @@ private fun DashboardSectionTitle(
 // ═══════════════════════════════════════════════════════════════
 
 @Composable
-private fun ItemStockCard(item: ItemStockInfo) {
+private fun ItemStockCard(item: ItemStockInfo, selectedDate: Long) {
+    val isToday = selectedDate == DateUtils.startOfToday()
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Item name + low stock warning
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    if (item.isLowStock) {
-                        Spacer(Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = PaymentUnpaidBg
-                        ) {
-                            Text(
-                                text = "LOW STOCK",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = PaymentUnpaid,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Item name + low stock warning
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = item.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (item.isLowStock) {
+                            Spacer(Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = PaymentUnpaidBg
+                            ) {
+                                Text(
+                                    text = "LOW STOCK",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PaymentUnpaid,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
+                    }
+                }
+
+                // Stock numbers: Total → Out/Booked → Available/Expected Available
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    StockNumber(label = "Total", value = item.totalStock, color = MaterialTheme.colorScheme.onSurface)
+                    if (isToday) {
+                        StockNumber(
+                            label = "Out Today",
+                            value = item.outStock,
+                            color = if (item.outStock > 0) PaymentPartial else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        StockNumber(
+                            label = "Available",
+                            value = item.availableStock,
+                            color = StatusCompleted
+                        )
+                    } else {
+                        StockNumber(
+                            label = "Booked",
+                            value = item.outStock,
+                            color = if (item.outStock > 0) PaymentPartial else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        StockNumber(
+                            label = "Expected Avail",
+                            value = item.availableStock,
+                            color = StatusCompleted
+                        )
                     }
                 }
             }
 
-            // Stock numbers
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                StockNumber(label = "Total", value = item.totalStock, color = MaterialTheme.colorScheme.onSurface)
-                StockNumber(label = "Avail", value = item.availableStock, color = StatusCompleted)
-                StockNumber(label = "Out", value = item.rentedStock, color = if (item.rentedStock > 0) PaymentPartial else MaterialTheme.colorScheme.onSurfaceVariant)
+            // Risk line (only if selected date is future and risk exists)
+            if (!isToday && item.riskStock > 0) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "Risk warning",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Risk: ${item.riskStock} pending returns",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = PaymentUnpaidBg
+                    ) {
+                        Text(
+                            text = "RISK",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PaymentUnpaid,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
             }
         }
     }

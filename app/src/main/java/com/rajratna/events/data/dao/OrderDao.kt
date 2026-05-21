@@ -135,8 +135,9 @@ interface OrderDao {
         SELECT oi.itemId, COALESCE(SUM(oi.quantity - oi.returnedQuantity), 0) AS totalRented
         FROM order_items oi
         INNER JOIN orders o ON oi.orderId = o.id
-        WHERE o.orderStatus IN ('Pending', 'Confirmed', 'Delivered')
+        WHERE o.orderStatus IN ('Confirmed', 'Delivered')
         AND (oi.quantity - oi.returnedQuantity) > 0
+        AND oi.isCustomerOwned = 0
         GROUP BY oi.itemId
     """)
     suspend fun getRentedQuantities(): List<RentedQuantity>
@@ -155,7 +156,7 @@ interface OrderDao {
     @Query("""
         SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END
         FROM order_items
-        WHERE orderId = :orderId AND quantity > returnedQuantity
+        WHERE orderId = :orderId AND quantity > returnedQuantity AND isCustomerOwned = 0
     """)
     suspend fun areAllItemsReturned(orderId: Long): Boolean
 
@@ -166,8 +167,9 @@ interface OrderDao {
     @Query("""
         SELECT DISTINCT o.* FROM orders o
         INNER JOIN order_items oi ON o.id = oi.orderId
-        WHERE o.orderStatus NOT IN ('Cancelled', 'Completed')
+        WHERE o.orderStatus IN ('Confirmed', 'Delivered')
         AND oi.quantity > oi.returnedQuantity
+        AND oi.isCustomerOwned = 0
         ORDER BY o.returnDate ASC
     """)
     suspend fun getOrdersWithPendingReturns(): List<Order>
@@ -178,9 +180,10 @@ interface OrderDao {
     @Query("""
         SELECT DISTINCT o.* FROM orders o
         INNER JOIN order_items oi ON o.id = oi.orderId
-        WHERE o.orderStatus NOT IN ('Cancelled', 'Completed')
+        WHERE o.orderStatus IN ('Confirmed', 'Delivered')
         AND oi.quantity > oi.returnedQuantity
         AND o.returnDate <= :endOfToday
+        AND oi.isCustomerOwned = 0
         ORDER BY o.returnDate ASC
         LIMIT :limit
     """)
@@ -192,9 +195,10 @@ interface OrderDao {
     @Query("""
         SELECT COUNT(DISTINCT o.id) FROM orders o
         INNER JOIN order_items oi ON o.id = oi.orderId
-        WHERE o.orderStatus NOT IN ('Cancelled', 'Completed')
+        WHERE o.orderStatus IN ('Confirmed', 'Delivered')
         AND oi.quantity > oi.returnedQuantity
         AND o.returnDate <= :endOfToday
+        AND oi.isCustomerOwned = 0
     """)
     suspend fun getPendingReturnCount(endOfToday: Long): Int
 
@@ -258,6 +262,78 @@ interface OrderDao {
 
     @Query("SELECT * FROM order_items WHERE orderId = :orderId LIMIT 1")
     suspend fun getFirstOrderItem(orderId: Long): OrderItem?
+
+    // ── Date-Wise Stock Queries ──────────────────────────────
+
+    /**
+     * Date-wise rented quantities.
+     * For a selected date, sum unreturned item quantities from non-cancelled orders
+     * where selected date falls within the rental period (delivery to return).
+     */
+    @Query("""
+        SELECT oi.itemId, COALESCE(SUM(oi.quantity - oi.returnedQuantity), 0) AS totalRented
+        FROM order_items oi
+        INNER JOIN orders o ON oi.orderId = o.id
+        WHERE o.orderStatus IN ('Confirmed', 'Delivered')
+        AND o.deliveryDate <= :selectedDate
+        AND (oi.quantity - oi.returnedQuantity) > 0
+        AND oi.isCustomerOwned = 0
+        GROUP BY oi.itemId
+    """)
+    suspend fun getDateWiseRentedQuantities(selectedDate: Long): List<RentedQuantity>
+
+    /**
+     * Date-wise rented quantities excluding a specific order (for edit mode validation).
+     */
+    @Query("""
+        SELECT oi.itemId, COALESCE(SUM(oi.quantity - oi.returnedQuantity), 0) AS totalRented
+        FROM order_items oi
+        INNER JOIN orders o ON oi.orderId = o.id
+        WHERE o.orderStatus IN ('Confirmed', 'Delivered')
+        AND o.id != :excludeOrderId
+        AND o.deliveryDate <= :selectedDate
+        AND (oi.quantity - oi.returnedQuantity) > 0
+        AND oi.isCustomerOwned = 0
+        GROUP BY oi.itemId
+    """)
+    suspend fun getDateWiseRentedQuantitiesExcluding(selectedDate: Long, excludeOrderId: Long): List<RentedQuantity>
+
+    // ── Reports: Item-wise Income ────────────────────────────
+
+    /**
+     * Item-wise income within a date range (based on delivery date).
+     * Excludes cancelled orders.
+     */
+    @Query("""
+        SELECT oi.itemName, COALESCE(SUM(oi.totalAmount), 0.0) AS totalIncome
+        FROM order_items oi
+        INNER JOIN orders o ON oi.orderId = o.id
+        WHERE o.deliveryDate >= :start AND o.deliveryDate < :end
+        AND o.orderStatus != 'Cancelled'
+        GROUP BY oi.itemName
+        ORDER BY totalIncome DESC
+    """)
+    suspend fun getItemWiseIncome(start: Long, end: Long): List<ItemIncome>
+
+    /**
+     * Total income (grand total) based on delivery date, excluding cancelled.
+     */
+    @Query("SELECT COALESCE(SUM(grandTotal), 0.0) FROM orders WHERE deliveryDate >= :start AND deliveryDate < :end AND orderStatus != 'Cancelled'")
+    suspend fun getTotalIncomeByDelivery(start: Long, end: Long): Double
+
+    /**
+     * Order count based on delivery date, excluding cancelled.
+     */
+    @Query("SELECT COUNT(*) FROM orders WHERE deliveryDate >= :start AND deliveryDate < :end AND orderStatus != 'Cancelled'")
+    suspend fun getOrderCountByDelivery(start: Long, end: Long): Int
+
+    /**
+     * Pending balance based on delivery date, excluding cancelled.
+     */
+    @Query("SELECT COALESCE(SUM(balanceAmount), 0.0) FROM orders WHERE deliveryDate >= :start AND deliveryDate < :end AND orderStatus != 'Cancelled'")
+    suspend fun getPendingBalanceByDelivery(start: Long, end: Long): Double
 }
 
 data class RentedQuantity(val itemId: Long, val totalRented: Int)
+
+data class ItemIncome(val itemName: String, val totalIncome: Double)

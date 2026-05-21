@@ -125,8 +125,8 @@ private fun ItemStockCard(
     val lowStockColor = MaterialTheme.colorScheme.tertiary
 
     Card(
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (!item.isActive)
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
