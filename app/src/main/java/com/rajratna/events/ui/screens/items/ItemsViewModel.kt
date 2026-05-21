@@ -74,6 +74,25 @@ class ItemsViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { repository.setItemActive(id, isActive) }
     }
 
+    fun deleteItem(item: Item, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            val isDefault = item.name.equals("Chair", ignoreCase = true) ||
+                    item.name.equals("Table", ignoreCase = true) ||
+                    item.name.equals("Water Jar", ignoreCase = true)
+            if (isDefault) {
+                onError("Default items (Chair, Table, Water Jar) cannot be deleted.")
+                return@launch
+            }
+            val usageCount = repository.getItemUsageCount(item.id)
+            if (usageCount > 0) {
+                onError("This item is used in existing orders. You can disable it instead.")
+            } else {
+                repository.deleteItem(item)
+                onSuccess()
+            }
+        }
+    }
+
     /** Compute available stock for a given item */
     fun getAvailable(item: Item, rentedMap: Map<Long, Int>): Int {
         val rented = rentedMap[item.id] ?: 0

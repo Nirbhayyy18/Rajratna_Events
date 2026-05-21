@@ -26,8 +26,10 @@ import com.rajratna.events.data.entity.Item
 @Composable
 fun ItemsScreen(onNavigateBack: () -> Unit, viewModel: ItemsViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
     var editItem by remember { mutableStateOf<Item?>(null) }
+    var itemToDelete by remember { mutableStateOf<Item?>(null) }
 
     Scaffold(
         topBar = {
@@ -104,6 +106,48 @@ fun ItemsScreen(onNavigateBack: () -> Unit, viewModel: ItemsViewModel = viewMode
                     )
                 )
                 editItem = null
+            },
+            onDelete = if (item.name.equals("Chair", ignoreCase = true) ||
+                item.name.equals("Table", ignoreCase = true) ||
+                item.name.equals("Water Jar", ignoreCase = true)
+            ) null else {
+                {
+                    itemToDelete = item
+                    editItem = null
+                }
+            }
+        )
+    }
+
+    itemToDelete?.let { item ->
+        AlertDialog(
+            onDismissRequest = { itemToDelete = null },
+            title = { Text("Delete Item?") },
+            text = { Text("This item will be permanently removed.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val currentItem = item
+                        itemToDelete = null
+                        viewModel.deleteItem(
+                            item = currentItem,
+                            onSuccess = {
+                                android.widget.Toast.makeText(context, "Item deleted successfully", android.widget.Toast.LENGTH_SHORT).show()
+                            },
+                            onError = { message ->
+                                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToDelete = null }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -252,7 +296,8 @@ private fun ItemDialog(
     initialTotalStock: String = "",
     initialLowStockAlert: String = "",
     onDismiss: () -> Unit,
-    onSave: (name: String, rate: Double, totalStock: Int, lowStockAlert: Int) -> Unit
+    onSave: (name: String, rate: Double, totalStock: Int, lowStockAlert: Int) -> Unit,
+    onDelete: (() -> Unit)? = null
 ) {
     var name by remember { mutableStateOf(initialName) }
     var rate by remember { mutableStateOf(initialRate) }
@@ -315,6 +360,21 @@ private fun ItemDialog(
                 }
             ) { Text("Save") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (onDelete != null) {
+                    TextButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Delete")
+                    }
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        }
     )
 }

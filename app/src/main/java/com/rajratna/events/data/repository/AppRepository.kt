@@ -30,6 +30,8 @@ class AppRepository(
     suspend fun setItemActive(id: Long, isActive: Boolean) = itemDao.setItemActive(id, isActive)
     suspend fun getRentedQuantities() = orderDao.getRentedQuantities()
     suspend fun getAllItemsList() = itemDao.getAllItemsList()
+    suspend fun getItemUsageCount(itemId: Long): Int = itemDao.getItemUsageCount(itemId)
+    suspend fun deleteItem(item: Item) = itemDao.deleteItem(item)
 
     // ══════════════════════════════════════════════════════════
     // CUSTOMERS

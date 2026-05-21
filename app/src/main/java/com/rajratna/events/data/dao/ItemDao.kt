@@ -30,4 +30,10 @@ interface ItemDao {
 
     @Query("SELECT * FROM items")
     suspend fun getAllItemsList(): List<Item>
+
+    @Query("SELECT COUNT(*) FROM order_items WHERE itemId = :itemId")
+    suspend fun getItemUsageCount(itemId: Long): Int
+
+    @Delete
+    suspend fun deleteItem(item: Item)
 }
