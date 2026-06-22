@@ -41,6 +41,17 @@ object DateUtils {
     /** Returns end of today (just before midnight) in millis. */
     fun endOfToday(): Long = startOfToday() + 24 * 60 * 60 * 1000L
 
+    /** Returns end of day (just before midnight) for any timestamp in millis. */
+    fun endOfDay(timestamp: Long): Long {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = timestamp
+        cal.set(Calendar.HOUR_OF_DAY, 23)
+        cal.set(Calendar.MINUTE, 59)
+        cal.set(Calendar.SECOND, 59)
+        cal.set(Calendar.MILLISECOND, 999)
+        return cal.timeInMillis
+    }
+
     /** Returns start of tomorrow. */
     fun startOfTomorrow(): Long = startOfToday() + 24 * 60 * 60 * 1000L
 
