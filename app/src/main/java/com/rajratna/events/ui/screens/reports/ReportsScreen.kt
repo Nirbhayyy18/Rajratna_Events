@@ -3,8 +3,6 @@ package com.rajratna.events.ui.screens.reports
 import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -15,12 +13,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rajratna.events.ui.components.AmountRow
 import com.rajratna.events.ui.theme.*
-import com.rajratna.events.util.WhatsAppUtils
+import com.rajratna.events.util.DateUtils
 import com.rajratna.events.util.toRupee
 import java.util.*
 
@@ -32,12 +31,6 @@ fun ReportsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-
-    // Custom date range picker state
-    var showStartPicker by remember { mutableStateOf(false) }
-    var showEndPicker by remember { mutableStateOf(false) }
-    var customStart by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var customEnd by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(Unit) { viewModel.loadReports() }
 
@@ -53,7 +46,7 @@ fun ReportsScreen(
             )
         }
     ) { padding ->
-        if (state.isLoading) {
+        if (state.isLoading && state.report.totalOrders == 0) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -63,43 +56,62 @@ fun ReportsScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // ── Period Filter Chips ─────────────────────
+                // ═══════════════════════════════════════════
+                // 1. Period Filter Tabs
+                // ═══════════════════════════════════════════
                 item {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(viewModel.periodOptions) { period ->
-                            FilterChip(
-                                selected = state.selectedPeriod == period,
-                                onClick = {
-                                    if (period == "Custom") {
-                                        showStartPicker = true
-                                    } else {
-                                        viewModel.selectPeriod(period)
-                                    }
-                                },
-                                label = {
-                                    Text(
-                                        if (period == "Custom") "📅 Custom" else period,
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
-                                },
-                                shape = RoundedCornerShape(10.dp)
+                    PeriodFilterTabs(
+                        selectedPeriod = state.selectedPeriod,
+                        onSelectPeriod = { viewModel.selectPeriod(it) }
+                    )
+                }
+
+                // ═══════════════════════════════════════════
+                // 2. Period-Specific Controls
+                // ═══════════════════════════════════════════
+                item {
+                    when (state.selectedPeriod) {
+                        "Today" -> {
+                            Text(
+                                text = state.dateRangeLabel,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        "Week" -> {
+                            Text(
+                                text = state.dateRangeLabel,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        "Month" -> {
+                            MonthSelector(
+                                monthLabel = viewModel.getMonthLabel(),
+                                onPrevious = { viewModel.navigateMonth(-1) },
+                                onNext = { viewModel.navigateMonth(1) },
+                                onCurrentMonth = { viewModel.selectCurrentMonth() },
+                                onPreviousMonth = { viewModel.selectPreviousMonth() }
+                            )
+                        }
+                        "Range" -> {
+                            RangeSelector(
+                                customStart = state.customStart,
+                                customEnd = state.customEnd?.let { it - 1 }, // minus the +1 offset for display
+                                rangeError = state.rangeError,
+                                onSelectStart = { viewModel.selectRangeStart(it) },
+                                onSelectEnd = { viewModel.selectRangeEnd(it) },
+                                onQuickRange = { viewModel.applyQuickRange(it) }
                             )
                         }
                     }
                 }
 
-                // ── Date Range Label ───────────────────────
-                item {
-                    Text(
-                        text = state.dateRangeLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // ── Summary Card ───────────────────────────
+                // ═══════════════════════════════════════════
+                // 3. Report Summary Card
+                // ═══════════════════════════════════════════
                 item {
                     Card(
                         shape = RoundedCornerShape(16.dp),
@@ -142,30 +154,44 @@ fun ReportsScreen(
                     }
                 }
 
-                // ── Item-wise Income ───────────────────────
-                if (state.report.itemWiseIncome.isNotEmpty()) {
-                    item {
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(2.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // ═══════════════════════════════════════════
+                // 4. Item Breakdown Card
+                // ═══════════════════════════════════════════
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(2.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                "Item Breakdown",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                            if (state.report.itemWiseIncome.isEmpty() && state.report.transportRent == 0.0) {
                                 Text(
-                                    "Item-wise Income",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
+                                    "No item income in this period",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            } else {
                                 state.report.itemWiseIncome.forEach { item ->
-                                    AmountRow(item.itemName, item.totalIncome)
+                                    AmountRow("${item.itemName} Income", item.totalIncome)
+                                }
+                                if (state.report.transportRent > 0) {
+                                    AmountRow("Transport Rent", state.report.transportRent)
                                 }
                             }
                         }
                     }
                 }
 
-                // ── Share / Export Buttons ──────────────────
+                // ═══════════════════════════════════════════
+                // 5. Share / Export Buttons
+                // ═══════════════════════════════════════════
                 item {
                     Row(
                         Modifier.fillMaxWidth(),
@@ -214,46 +240,262 @@ fun ReportsScreen(
             }
         }
     }
+}
 
-    // ── Custom Date Pickers ────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// PERIOD FILTER TABS — Today | Week | Month | Range
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun PeriodFilterTabs(
+    selectedPeriod: String,
+    onSelectPeriod: (String) -> Unit
+) {
+    val periods = listOf("Today", "Week", "Month", "Range")
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        periods.forEach { period ->
+            FilterChip(
+                selected = selectedPeriod == period,
+                onClick = { onSelectPeriod(period) },
+                label = {
+                    Text(
+                        period,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (selectedPeriod == period) FontWeight.Bold else FontWeight.Normal
+                    )
+                },
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MONTH SELECTOR — < May 2026 > with quick buttons
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun MonthSelector(
+    monthLabel: String,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onCurrentMonth: () -> Unit,
+    onPreviousMonth: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+    ) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Month navigation row
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onPrevious) {
+                    Icon(
+                        Icons.Default.ChevronLeft,
+                        contentDescription = "Previous Month",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Text(
+                    text = monthLabel,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                IconButton(onClick = onNext) {
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = "Next Month",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Quick buttons
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AssistChip(
+                    onClick = onCurrentMonth,
+                    label = { Text("Current Month", style = MaterialTheme.typography.labelMedium) },
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                )
+                AssistChip(
+                    onClick = onPreviousMonth,
+                    label = { Text("Previous Month", style = MaterialTheme.typography.labelMedium) },
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RANGE SELECTOR — From / To dates with quick range chips
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+private fun RangeSelector(
+    customStart: Long?,
+    customEnd: Long?,
+    rangeError: String?,
+    onSelectStart: (Long) -> Unit,
+    onSelectEnd: (Long) -> Unit,
+    onQuickRange: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var showStartPicker by remember { mutableStateOf(false) }
+    var showEndPicker by remember { mutableStateOf(false) }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+    ) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Date fields row
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // From Date
+                OutlinedCard(
+                    onClick = { showStartPicker = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "From Date",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = if (customStart != null) DateUtils.formatShortDate(customStart)
+                            else "Select",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                // To Date
+                OutlinedCard(
+                    onClick = { showEndPicker = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "To Date",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = if (customEnd != null) DateUtils.formatShortDate(customEnd)
+                            else "Select",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            // Range Error
+            if (rangeError != null) {
+                Text(
+                    text = rangeError,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            // Quick range chips
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("Last 7 Days", "Last 30 Days", "This Month").forEach { label ->
+                    AssistChip(
+                        onClick = { onQuickRange(label) },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+
+    // Date Pickers
     if (showStartPicker) {
         val cal = Calendar.getInstance()
+        if (customStart != null) cal.timeInMillis = customStart
         DatePickerDialog(
             context,
             { _, year, month, day ->
                 val c = Calendar.getInstance()
                 c.set(year, month, day, 0, 0, 0)
                 c.set(Calendar.MILLISECOND, 0)
-                customStart = c.timeInMillis
+                onSelectStart(c.timeInMillis)
                 showStartPicker = false
-                showEndPicker = true
             },
             cal.get(Calendar.YEAR),
             cal.get(Calendar.MONTH),
             cal.get(Calendar.DAY_OF_MONTH)
         ).apply {
-            setTitle("Select Start Date")
+            setTitle("Select From Date")
             setOnCancelListener { showStartPicker = false }
         }.show()
     }
 
     if (showEndPicker) {
         val cal = Calendar.getInstance()
+        if (customEnd != null) cal.timeInMillis = customEnd
         DatePickerDialog(
             context,
             { _, year, month, day ->
                 val c = Calendar.getInstance()
                 c.set(year, month, day, 23, 59, 59)
                 c.set(Calendar.MILLISECOND, 999)
-                customEnd = c.timeInMillis + 1
+                onSelectEnd(c.timeInMillis)
                 showEndPicker = false
-                viewModel.selectCustomRange(customStart, customEnd)
             },
             cal.get(Calendar.YEAR),
             cal.get(Calendar.MONTH),
             cal.get(Calendar.DAY_OF_MONTH)
         ).apply {
-            setTitle("Select End Date")
+            setTitle("Select To Date")
             setOnCancelListener { showEndPicker = false }
         }.show()
     }

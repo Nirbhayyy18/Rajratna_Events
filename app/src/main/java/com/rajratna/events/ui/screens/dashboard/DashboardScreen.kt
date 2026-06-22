@@ -98,9 +98,9 @@ fun DashboardScreen(
                     )
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToItems) {
-                        Icon(Icons.Outlined.Inventory2, contentDescription = "Inventory")
-                    }
+//                    IconButton(onClick = onNavigateToItems) {
+//                        Icon(Icons.Outlined.Inventory2, contentDescription = "Inventory")
+//                    }
                     IconButton(onClick = onNavigateToBackup) {
                         Icon(Icons.Outlined.Backup, contentDescription = "Backup")
                     }
@@ -164,18 +164,18 @@ fun DashboardScreen(
                     )
                 }
 
-                item {
-                    SectionTitle("Quick Actions")
-                }
-
-                item {
-                    QuickActionsRow(
-                        onNavigateToNewOrder = onNavigateToNewOrder,
-                        onNavigateToReturns = onNavigateToReturns,
-                        onNavigateToPayments = onNavigateToPayments,
-                        onNavigateToReports = onNavigateToReports
-                    )
-                }
+//                item {
+//                    SectionTitle("Quick Actions")
+//                }
+//
+//                item {
+//                    QuickActionsRow(
+//                        onNavigateToNewOrder = onNavigateToNewOrder,
+//                        onNavigateToReturns = onNavigateToReturns,
+//                        onNavigateToPayments = onNavigateToPayments,
+//                        onNavigateToReports = onNavigateToReports
+//                    )
+//                }
 
                 item {
                     SectionTitle("Important Alerts")
@@ -291,52 +291,52 @@ private fun SectionTitle(title: String) {
     Text(text = title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
 }
 
-@Composable
-private fun QuickActionsRow(
-    onNavigateToNewOrder: () -> Unit,
-    onNavigateToReturns: () -> Unit,
-    onNavigateToPayments: () -> Unit,
-    onNavigateToReports: () -> Unit
-) {
-    val actions = listOf(
-        QuickActionUi("New Order", "Create order", Icons.Default.Add, Color(0xFFEFF4FF), Color(0xFF1858D2), onNavigateToNewOrder),
-        QuickActionUi("Record Return", "Add return", Icons.Default.Replay, Color(0xFFEFFAF3), Color(0xFF2F9B50), onNavigateToReturns),
-        QuickActionUi("Add Payment", "Record payment", Icons.Default.Payment, Color(0xFFFFF6EA), Color(0xFFDB7A00), onNavigateToPayments),
-        QuickActionUi("Reports", "View reports", Icons.Default.Assessment, Color(0xFFF7F1FF), Color(0xFF7A3CC8), onNavigateToReports)
-    )
-
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        actions.forEach { action ->
-            Card(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable(onClick = action.onClick),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = action.bgColor),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp, horizontal = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .background(action.iconTint.copy(alpha = 0.16f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(action.icon, contentDescription = null, tint = action.iconTint, modifier = Modifier.size(18.dp))
-                    }
-                    Text(action.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = action.iconTint, maxLines = 1)
-                    Text(action.subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                }
-            }
-        }
-    }
-}
+//@Composable
+//private fun QuickActionsRow(
+//    onNavigateToNewOrder: () -> Unit,
+//    onNavigateToReturns: () -> Unit,
+//    onNavigateToPayments: () -> Unit,
+//    onNavigateToReports: () -> Unit
+//) {
+//    val actions = listOf(
+//        QuickActionUi("New Order", "Create order", Icons.Default.Add, Color(0xFFEFF4FF), Color(0xFF1858D2), onNavigateToNewOrder),
+//        QuickActionUi("Record Return", "Add return", Icons.Default.Replay, Color(0xFFEFFAF3), Color(0xFF2F9B50), onNavigateToReturns),
+//        QuickActionUi("Add Payment", "Record payment", Icons.Default.Payment, Color(0xFFFFF6EA), Color(0xFFDB7A00), onNavigateToPayments),
+//        QuickActionUi("Reports", "View reports", Icons.Default.Assessment, Color(0xFFF7F1FF), Color(0xFF7A3CC8), onNavigateToReports)
+//    )
+//
+//    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+//        actions.forEach { action ->
+//            Card(
+//                modifier = Modifier
+//                    .weight(1f)
+//                    .clickable(onClick = action.onClick),
+//                shape = RoundedCornerShape(14.dp),
+//                colors = CardDefaults.cardColors(containerColor = action.bgColor),
+//                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+//            ) {
+//                Column(
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .padding(vertical = 12.dp, horizontal = 10.dp),
+//                    horizontalAlignment = Alignment.CenterHorizontally,
+//                    verticalArrangement = Arrangement.spacedBy(6.dp)
+//                ) {
+//                    Box(
+//                        modifier = Modifier
+//                            .size(30.dp)
+//                            .background(action.iconTint.copy(alpha = 0.16f), CircleShape),
+//                        contentAlignment = Alignment.Center
+//                    ) {
+//                        Icon(action.icon, contentDescription = null, tint = action.iconTint, modifier = Modifier.size(18.dp))
+//                    }
+//                    Text(action.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = action.iconTint, maxLines = 1)
+//                    Text(action.subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+//                }
+//            }
+//        }
+//    }
+//}
 
 @Composable
 private fun AlertsCard(alerts: List<DashboardAlertInfo>, onClick: (DashboardAlertType) -> Unit) {
