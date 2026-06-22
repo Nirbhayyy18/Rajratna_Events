@@ -59,6 +59,8 @@ data class ReturnsState(
     val filteredPendingOrders: List<PendingReturnOrder> = emptyList(),
     val returnedOrders: List<ReturnedOrder> = emptyList(),
     val filteredReturnedOrders: List<ReturnedOrder> = emptyList(),
+    // Date filter
+    val selectedDate: Long? = null,
     // Record Return dialog state
     val showRecordReturn: Boolean = false,
     val recordReturnOrderId: Long = 0,
@@ -115,8 +117,8 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
                 returnedOrders = returnedOrderModels
             )
 
-            applyPendingFilter(_state.value.pendingFilter)
-            applyReturnedFilter(_state.value.returnedFilter)
+            applyPendingFilter(_state.value.pendingFilter, _state.value.selectedDate)
+            applyReturnedFilter(_state.value.returnedFilter, _state.value.selectedDate)
         }
     }
 
@@ -125,42 +127,69 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun setPendingFilter(filter: PendingFilter) {
-        _state.value = _state.value.copy(pendingFilter = filter)
-        applyPendingFilter(filter)
+        _state.value = _state.value.copy(pendingFilter = filter, selectedDate = null)
+        applyPendingFilter(filter, null)
     }
 
     fun setReturnedFilter(filter: ReturnedFilter) {
-        _state.value = _state.value.copy(returnedFilter = filter)
-        applyReturnedFilter(filter)
+        _state.value = _state.value.copy(returnedFilter = filter, selectedDate = null)
+        applyReturnedFilter(filter, null)
     }
 
-    private fun applyPendingFilter(filter: PendingFilter) {
+    fun setSelectedDate(dateMillis: Long?) {
+        _state.value = _state.value.copy(selectedDate = dateMillis)
+        if (_state.value.selectedTab == 0) {
+            applyPendingFilter(_state.value.pendingFilter, dateMillis)
+        } else {
+            applyReturnedFilter(_state.value.returnedFilter, dateMillis)
+        }
+    }
+
+    private fun applyPendingFilter(filter: PendingFilter, selectedDate: Long?) {
+        val baseList = _state.value.pendingOrders
+        val filteredByDate = if (selectedDate != null) {
+            val dayStart = DateUtils.startOfDay(selectedDate)
+            val dayEnd = DateUtils.endOfDay(selectedDate)
+            baseList.filter { it.order.returnDate in dayStart until dayEnd }
+        } else {
+            baseList
+        }
+
         val filtered = when (filter) {
-            PendingFilter.ALL -> _state.value.pendingOrders
-            PendingFilter.DUE_TODAY -> _state.value.pendingOrders.filter { it.isDueToday }
-            PendingFilter.OVERDUE -> _state.value.pendingOrders.filter { it.isOverdue }
-            PendingFilter.UPCOMING -> _state.value.pendingOrders.filter { it.isUpcoming }
+            PendingFilter.ALL -> filteredByDate
+            PendingFilter.DUE_TODAY -> filteredByDate.filter { it.isDueToday }
+            PendingFilter.OVERDUE -> filteredByDate.filter { it.isOverdue }
+            PendingFilter.UPCOMING -> filteredByDate.filter { it.isUpcoming }
         }
         _state.value = _state.value.copy(filteredPendingOrders = filtered)
     }
 
-    private fun applyReturnedFilter(filter: ReturnedFilter) {
+    private fun applyReturnedFilter(filter: ReturnedFilter, selectedDate: Long?) {
         val todayStart = DateUtils.startOfToday()
         val todayEnd = DateUtils.endOfToday()
         val weekStart = DateUtils.startOfThisWeek()
         val monthStart = DateUtils.startOfThisMonth()
 
+        val baseList = _state.value.returnedOrders
+        val filteredByDate = if (selectedDate != null) {
+            val dayStart = DateUtils.startOfDay(selectedDate)
+            val dayEnd = DateUtils.endOfDay(selectedDate)
+            baseList.filter { it.order.updatedAt in dayStart until dayEnd }
+        } else {
+            baseList
+        }
+
         val filtered = when (filter) {
-            ReturnedFilter.TODAY -> _state.value.returnedOrders.filter {
+            ReturnedFilter.TODAY -> filteredByDate.filter {
                 it.order.updatedAt in todayStart until todayEnd
             }
-            ReturnedFilter.THIS_WEEK -> _state.value.returnedOrders.filter {
+            ReturnedFilter.THIS_WEEK -> filteredByDate.filter {
                 it.order.updatedAt >= weekStart
             }
-            ReturnedFilter.THIS_MONTH -> _state.value.returnedOrders.filter {
+            ReturnedFilter.THIS_MONTH -> filteredByDate.filter {
                 it.order.updatedAt >= monthStart
             }
-            ReturnedFilter.ALL -> _state.value.returnedOrders
+            ReturnedFilter.ALL -> filteredByDate
         }
         _state.value = _state.value.copy(filteredReturnedOrders = filtered)
     }
