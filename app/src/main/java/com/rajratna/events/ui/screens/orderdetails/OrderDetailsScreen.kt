@@ -29,6 +29,7 @@ fun OrderDetailsScreen(
     orderId: Long,
     onNavigateBack: () -> Unit,
     onEditOrder: (Long) -> Unit,
+    onNavigateToBillPreview: (Long) -> Unit = {},
     viewModel: OrderDetailsViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -37,6 +38,7 @@ fun OrderDetailsScreen(
     var showCancelConfirm by remember { mutableStateOf(false) }
     var showDeliverConfirm by remember { mutableStateOf(false) }
     var showRecordReturnDialog by remember { mutableStateOf(false) }
+    var showBillSheet by remember { mutableStateOf(false) }
     var returnEntries by remember { mutableStateOf<List<LocalReturnEntry>>(emptyList()) }
 
     LaunchedEffect(orderId) { viewModel.loadOrder(orderId) }
@@ -117,10 +119,8 @@ fun OrderDetailsScreen(
                                 FilledTonalButton(onClick = { WhatsAppUtils.callCustomer(context, order.customerMobile) }) {
                                     Icon(Icons.Default.Call, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Call")
                                 }
-                                FilledTonalButton(onClick = {
-                                    WhatsAppUtils.shareOnWhatsApp(context, order.customerMobile, WhatsAppUtils.generateBillMessage(order, state.orderItems))
-                                }) {
-                                    Icon(Icons.Default.Share, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Bill")
+                                FilledTonalButton(onClick = { showBillSheet = true }) {
+                                    Icon(Icons.Default.Receipt, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Marathi Bill")
                                 }
                                 if (order.balanceAmount > 0) {
                                     FilledTonalButton(onClick = {
@@ -248,7 +248,7 @@ fun OrderDetailsScreen(
                                     OrderStatus.CONFIRMED -> {
                                         viewModel.updateStatus(status) {
                                             android.widget.Toast.makeText(context, "Order Confirmed successfully", android.widget.Toast.LENGTH_SHORT).show()
-                                            WhatsAppUtils.shareOnWhatsApp(context, order.customerMobile, WhatsAppUtils.generateOrderConfirmation(order))
+                                            showBillSheet = true
                                         }
                                     }
                                     OrderStatus.COMPLETED -> {
@@ -455,6 +455,17 @@ fun OrderDetailsScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    // Bill Options Bottom Sheet
+    if (showBillSheet && order != null) {
+        BillOptionsSheet(
+            order = order,
+            orderItems = state.orderItems,
+            totalPaid = order.grandTotal - order.balanceAmount,
+            onDismiss = { showBillSheet = false },
+            onPreviewBill = { onNavigateToBillPreview(orderId) }
         )
     }
 }

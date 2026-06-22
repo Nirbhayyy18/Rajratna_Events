@@ -104,6 +104,26 @@ object DateUtils {
         val days = (diff / (24 * 60 * 60 * 1000L)).toInt()
         return if (days < 1) 1 else days
     }
+
+    // ── Marathi Date Formatting ─────────────────────────────
+
+    private val marathiMonths = arrayOf(
+        "जानेवारी", "फेब्रुवारी", "मार्च", "एप्रिल",
+        "मे", "जून", "जुलै", "ऑगस्ट",
+        "सप्टेंबर", "ऑक्टोबर", "नोव्हेंबर", "डिसेंबर"
+    )
+
+    /**
+     * Format timestamp as Marathi date string, e.g. "21 मे 2026".
+     */
+    fun formatMarathiDate(timestamp: Long): String {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = timestamp
+        val day = cal.get(Calendar.DAY_OF_MONTH)
+        val month = marathiMonths[cal.get(Calendar.MONTH)]
+        val year = cal.get(Calendar.YEAR)
+        return "$day $month $year"
+    }
 }
 
 /**

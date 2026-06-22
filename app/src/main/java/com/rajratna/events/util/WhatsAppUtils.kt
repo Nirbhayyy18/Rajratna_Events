@@ -3,8 +3,10 @@ package com.rajratna.events.util
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.FileProvider
 import com.rajratna.events.data.entity.Order
 import com.rajratna.events.data.entity.OrderItem
+import java.io.File
 
 /**
  * Utility to generate WhatsApp messages and share/call actions.
@@ -129,6 +131,52 @@ Balance: ${order.balanceAmount.toInt()} rs
     }
 
     /**
+     * Share a file (PDF/image) on WhatsApp with an optional text message.
+     * Falls back to generic share sheet if WhatsApp is not installed.
+     */
+    fun shareFileOnWhatsApp(context: Context, phoneNumber: String, file: File, mimeType: String, message: String) {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        try {
+            val formattedNumber = if (phoneNumber.startsWith("+")) {
+                phoneNumber.replace("+", "").replace(" ", "")
+            } else if (phoneNumber.length == 10) {
+                "91$phoneNumber"
+            } else {
+                phoneNumber.replace(" ", "")
+            }
+
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_TEXT, message)
+                putExtra("jid", "$formattedNumber@s.whatsapp.net")
+                setPackage("com.whatsapp")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback to generic share
+            shareFile(context, file, mimeType, message)
+        }
+    }
+
+    /**
+     * Share a file via the generic Android share sheet.
+     */
+    fun shareFile(context: Context, file: File, mimeType: String, message: String = "") {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = mimeType
+            putExtra(Intent.EXTRA_STREAM, uri)
+            if (message.isNotBlank()) {
+                putExtra(Intent.EXTRA_TEXT, message)
+            }
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share Bill"))
+    }
+
+    /**
      * Initiate a phone call.
      */
     fun callCustomer(context: Context, phoneNumber: String) {
@@ -138,3 +186,4 @@ Balance: ${order.balanceAmount.toInt()} rs
         context.startActivity(intent)
     }
 }
+

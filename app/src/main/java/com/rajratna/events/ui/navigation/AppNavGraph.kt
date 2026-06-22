@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.rajratna.events.ui.screens.backup.BackupScreen
+import com.rajratna.events.ui.screens.billpreview.BillPreviewScreen
 import com.rajratna.events.ui.screens.customerdetails.CustomerDetailsScreen
 import com.rajratna.events.ui.screens.customers.CustomersScreen
 import com.rajratna.events.ui.screens.dashboard.DashboardScreen
@@ -91,7 +92,20 @@ fun AppNavGraph(navController: NavHostController, modifier: Modifier = Modifier)
             OrderDetailsScreen(
                 orderId = orderId,
                 onNavigateBack = { navController.popBackStack() },
-                onEditOrder = { navController.navigate(Screen.EditOrder.createRoute(it)) }
+                onEditOrder = { navController.navigate(Screen.EditOrder.createRoute(it)) },
+                onNavigateToBillPreview = { navController.navigate(Screen.BillPreview.createRoute(it)) }
+            )
+        }
+
+        // Bill Preview
+        composable(
+            route = Screen.BillPreview.route,
+            arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
+            BillPreviewScreen(
+                orderId = orderId,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
