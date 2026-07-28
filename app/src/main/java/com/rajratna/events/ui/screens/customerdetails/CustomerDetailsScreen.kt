@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rajratna.events.data.entity.PaymentStatusType
@@ -66,16 +68,93 @@ fun CustomerDetailsScreen(
         } else {
             LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // Customer info card
+//                item {
+//                    Card(shape = RoundedCornerShape(14.dp)) {
+//                        Column(Modifier.padding(16.dp)) {
+//                            Text(customer.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+//                            Text(customer.mobileNumber, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+//                            if (customer.address.isNotBlank()) Text(customer.address, style = MaterialTheme.typography.bodyMedium)
+//                            Spacer(Modifier.height(12.dp))
+//                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+//                                FilledTonalButton(onClick = { WhatsAppUtils.callCustomer(context, customer.mobileNumber) }) { Icon(Icons.Default.Call, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Call") }
+//                                FilledTonalButton(onClick = { WhatsAppUtils.shareOnWhatsApp(context, customer.mobileNumber, "Hello ${customer.name}") }) { Icon(Icons.Default.Share, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("WhatsApp") }
+//                            }
+//                        }
+//                    }
+//                }
+
                 item {
-                    Card(shape = RoundedCornerShape(14.dp)) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(customer.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                            Text(customer.mobileNumber, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            if (customer.address.isNotBlank()) Text(customer.address, style = MaterialTheme.typography.bodyMedium)
-                            Spacer(Modifier.height(12.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilledTonalButton(onClick = { WhatsAppUtils.callCustomer(context, customer.mobileNumber) }) { Icon(Icons.Default.Call, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Call") }
-                                FilledTonalButton(onClick = { WhatsAppUtils.shareOnWhatsApp(context, customer.mobileNumber, "Hello ${customer.name}") }) { Icon(Icons.Default.Share, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("WhatsApp") }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+
+                            // Avatar
+                            Surface(
+                                modifier = Modifier.size(56.dp),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = customer.name.first().uppercase(),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.width(16.dp))
+
+                            // Customer Details
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+
+                                Text(
+                                    text = customer.name,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Text(
+                                    text = customer.mobileNumber,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                if (customer.address.isNotBlank()) {
+                                    Text(
+                                        text = customer.address,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.width(12.dp))
+
+                            // Call Button
+                            FilledTonalIconButton(
+                                onClick = {
+                                    WhatsAppUtils.callCustomer(
+                                        context,
+                                        customer.mobileNumber
+                                    )
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Default.Call,
+                                    contentDescription = "Call Customer"
+                                )
                             }
                         }
                     }
@@ -124,51 +203,149 @@ fun CustomerDetailsScreen(
                     }
                 }
 
-                // ── Quick Action Buttons ─────────────────────────────
+//                // ── Quick Action Buttons ─────────────────────────────
+//                item {
+//                    Row(
+//                        Modifier.fillMaxWidth(),
+//                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+//                    ) {
+//                        // + Jar
+//                        Button(
+//                            onClick = { viewModel.openQuickJar() },
+//                            modifier = Modifier.weight(1f).height(44.dp),
+//                            shape = RoundedCornerShape(12.dp),
+//                            colors = ButtonDefaults.buttonColors(containerColor = Teal40)
+//                        ) {
+//                            Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+//                            Spacer(Modifier.width(4.dp))
+//                            Text("Jar", fontWeight = FontWeight.Bold)
+//                        }
+//
+//                        // Return Jar
+//                        if (jarStats.pendingReturnJars > 0) {
+//                            OutlinedButton(
+//                                onClick = { viewModel.openReturnJar() },
+//                                modifier = Modifier.weight(1f).height(44.dp),
+//                                shape = RoundedCornerShape(12.dp)
+//                            ) {
+//                                Icon(Icons.Default.AssignmentReturn, null, Modifier.size(18.dp))
+//                                Spacer(Modifier.width(4.dp))
+//                                Text("Return")
+//                            }
+//                        }
+//
+//                        // Record Payment
+//                        if (jarStats.pendingBalance > 0) {
+//                            OutlinedButton(
+//                                onClick = { viewModel.openRecordPayment() },
+//                                modifier = Modifier.weight(1f).height(44.dp),
+//                                shape = RoundedCornerShape(12.dp)
+//                            ) {
+//                                Icon(Icons.Default.Payment, null, Modifier.size(18.dp))
+//                                Spacer(Modifier.width(4.dp))
+//                                Text("Pay")
+//                            }
+//                        }
+//
+//                        // WhatsApp Summary
+//                        OutlinedButton(
+//                            onClick = {
+//                                val message = WhatsAppUtils.generateCustomerJarSummary(
+//                                    customer.name,
+//                                    jarStats.thisMonthJarCount,
+//                                    jarStats.thisMonthJarAmount,
+//                                    jarStats.totalPaid,
+//                                    jarStats.pendingBalance,
+//                                    jarStats.pendingReturnJars
+//                                )
+//                                WhatsAppUtils.shareOnWhatsApp(context, customer.mobileNumber, message)
+//                            },
+//                            modifier = Modifier.height(44.dp),
+//                            shape = RoundedCornerShape(12.dp),
+//                            contentPadding = PaddingValues(horizontal = 12.dp)
+//                        ) {
+//                            Icon(Icons.Default.Chat, null, Modifier.size(18.dp))
+//                        }
+//                    }
+//                }
+
                 item {
                     Row(
-                        Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+
+                        val buttonModifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+
                         // + Jar
                         Button(
                             onClick = { viewModel.openQuickJar() },
-                            modifier = Modifier.weight(1f).height(44.dp),
+                            modifier = buttonModifier,
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Teal40)
+                            colors = ButtonDefaults.buttonColors(containerColor = Teal40),
+                            contentPadding = PaddingValues(horizontal = 6.dp)
                         ) {
-                            Icon(Icons.Default.Add, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Jar", fontWeight = FontWeight.Bold)
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                "Jar",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
                         }
 
                         // Return Jar
                         if (jarStats.pendingReturnJars > 0) {
                             OutlinedButton(
                                 onClick = { viewModel.openReturnJar() },
-                                modifier = Modifier.weight(1f).height(44.dp),
-                                shape = RoundedCornerShape(12.dp)
+                                modifier = buttonModifier,
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp)
                             ) {
-                                Icon(Icons.Default.AssignmentReturn, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Return")
+                                Icon(
+                                    Icons.Default.AssignmentReturn,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(2.dp))
+                                Text(
+                                    "Return",
+                                    fontSize = 13.sp,
+                                    maxLines = 1
+                                )
                             }
                         }
 
-                        // Record Payment
+                        // Payment
                         if (jarStats.pendingBalance > 0) {
                             OutlinedButton(
                                 onClick = { viewModel.openRecordPayment() },
-                                modifier = Modifier.weight(1f).height(44.dp),
-                                shape = RoundedCornerShape(12.dp)
+                                modifier = buttonModifier,
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp)
                             ) {
-                                Icon(Icons.Default.Payment, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Pay")
+                                Icon(
+                                    Icons.Default.Payment,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(2.dp))
+                                Text(
+                                    "Pay",
+                                    fontSize = 13.sp,
+                                    maxLines = 1
+                                )
                             }
                         }
 
-                        // WhatsApp Summary
+                        // WhatsApp
                         OutlinedButton(
                             onClick = {
                                 val message = WhatsAppUtils.generateCustomerJarSummary(
@@ -179,17 +356,30 @@ fun CustomerDetailsScreen(
                                     jarStats.pendingBalance,
                                     jarStats.pendingReturnJars
                                 )
-                                WhatsAppUtils.shareOnWhatsApp(context, customer.mobileNumber, message)
+                                WhatsAppUtils.shareOnWhatsApp(
+                                    context,
+                                    customer.mobileNumber,
+                                    message
+                                )
                             },
-                            modifier = Modifier.height(44.dp),
+                            modifier = buttonModifier,
                             shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp)
+                            contentPadding = PaddingValues(horizontal = 6.dp)
                         ) {
-                            Icon(Icons.Default.Chat, null, Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.Chat,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                "Share",
+                                fontSize = 13.sp,
+                                maxLines = 1
+                            )
                         }
                     }
                 }
-
                 // ── Overall Stats ────────────────────────────────────
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

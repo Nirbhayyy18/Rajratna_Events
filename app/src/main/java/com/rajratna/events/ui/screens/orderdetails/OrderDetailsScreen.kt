@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.CurrencyRupee
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -99,36 +101,128 @@ fun OrderDetailsScreen(
                     }
                 }
                 // Customer info
+//                item {
+//                    Card(
+//                        shape = RoundedCornerShape(16.dp),
+//                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+//                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+//                    ) {
+//                        Column(Modifier.padding(20.dp)) {
+//                            Text("👤 Customer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+//                            Spacer(Modifier.height(12.dp))
+//                            Text(order.customerName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+//                            Text(order.customerMobile, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+//                            if (order.customerAddress.isNotBlank()) {
+//                                Spacer(Modifier.height(4.dp))
+//                                Text(order.customerAddress, style = MaterialTheme.typography.bodyMedium)
+//                            }
+//                            Spacer(Modifier.height(16.dp))
+//                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+//                                FilledTonalButton(onClick = { WhatsAppUtils.callCustomer(context, order.customerMobile) }) {
+//                                    Icon(Icons.Default.Call, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Call")
+//                                }
+//                                FilledTonalButton(onClick = { showBillSheet = true }) {
+//                                    Icon(Icons.Default.Receipt, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Bill")
+//                                }
+//                                if (order.balanceAmount > 0) {
+//                                    FilledTonalButton(onClick = {
+//                                        WhatsAppUtils.shareOnWhatsApp(context, order.customerMobile, WhatsAppUtils.generatePaymentReminder(order))
+//                                    }) {
+//                                        Icon(Icons.Default.NotificationsActive, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp));Text("Rem")
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
+
                 item {
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        Column(Modifier.padding(20.dp)) {
-                            Text("👤 Customer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(12.dp))
-                            Text(order.customerName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text(order.customerMobile, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            if (order.customerAddress.isNotBlank()) {
-                                Spacer(Modifier.height(4.dp))
-                                Text(order.customerAddress, style = MaterialTheme.typography.bodyMedium)
-                            }
-                            Spacer(Modifier.height(16.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilledTonalButton(onClick = { WhatsAppUtils.callCustomer(context, order.customerMobile) }) {
-                                    Icon(Icons.Default.Call, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Call")
+
+                        Column(
+                            modifier = Modifier.padding(20.dp)
+                        ) {
+
+                            // Header
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+
+                                    Spacer(Modifier.width(8.dp))
+
+                                    Text(
+                                        "Customer",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
                                 }
-                                FilledTonalButton(onClick = { showBillSheet = true }) {
-                                    Icon(Icons.Default.Receipt, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Marathi Bill")
-                                }
-                                if (order.balanceAmount > 0) {
-                                    FilledTonalButton(onClick = {
-                                        WhatsAppUtils.shareOnWhatsApp(context, order.customerMobile, WhatsAppUtils.generatePaymentReminder(order))
-                                    }) {
-                                        Icon(Icons.Default.NotificationsActive, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Remind")
+
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        WhatsAppUtils.callCustomer(
+                                            context,
+                                            order.customerMobile
+                                        )
                                     }
+                                ) {
+                                    Icon(Icons.Default.Call, contentDescription = "Call")
                                 }
+
+                                Spacer(Modifier.width(8.dp))
+
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        showBillSheet = true
+                                    }
+                                ) {
+                                    Icon(Icons.Default.Receipt, contentDescription = "Bill")
+                                }
+                            }
+
+                            Spacer(Modifier.height(16.dp))
+
+                            Text(
+                                order.customerName,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Spacer(Modifier.height(4.dp))
+
+                            Text(
+                                order.customerMobile,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            if (order.customerAddress.isNotBlank()) {
+
+                                Spacer(Modifier.height(4.dp))
+
+                                Text(
+                                    order.customerAddress,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
@@ -470,32 +564,209 @@ fun OrderDetailsScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PaymentDialog(maxAmount: Double, onDismiss: () -> Unit, onConfirm: (Double, String, String) -> Unit) {
     var amount by remember { mutableStateOf(maxAmount.toInt().toString()) }
     var method by remember { mutableStateOf(PaymentMethod.CASH) }
     var notes by remember { mutableStateOf("") }
 
+//    AlertDialog(
+//        onDismissRequest = onDismiss,
+//        title = { Text("Record Payment") },
+//        text = {
+//            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+//                OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount (₹)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+//                Text("Payment Method", style = MaterialTheme.typography.labelMedium)
+//                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+//                    PaymentMethod.all.forEach { m ->
+//                        FilterChip(selected = method == m, onClick = { method = m }, label = { Text(m, style = MaterialTheme.typography.labelSmall) })
+//                    }
+//                }
+//                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+//            }
+//        },
+//        confirmButton = {
+//            Button(onClick = { amount.toDoubleOrNull()?.let { onConfirm(it, method, notes) } }) { Text("Save") }
+//        },
+//        dismissButton = {
+//            TextButton(onClick = onDismiss) { Text("Cancel") }
+//        }
+//    )
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Record Payment") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount (₹)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
-                Text("Payment Method", style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PaymentMethod.all.forEach { m ->
-                        FilterChip(selected = method == m, onClick = { method = m }, label = { Text(m, style = MaterialTheme.typography.labelSmall) })
-                    }
-                }
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+
+        shape = RoundedCornerShape(24.dp),
+
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                Icon(
+                    Icons.Default.Payments,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(Modifier.width(8.dp))
+
+                Text(
+                    text = "Record Payment",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
             }
         },
-        confirmButton = {
-            Button(onClick = { amount.toDoubleOrNull()?.let { onConfirm(it, method, notes) } }) { Text("Save") }
+
+        text = {
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+
+                // Amount
+
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Text("Amount")
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Outlined.CurrencyRupee,
+                            contentDescription = null
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number
+                    ),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                // Payment Method
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+                    Icon(
+                        Icons.Default.AccountBalanceWallet,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(Modifier.width(6.dp))
+
+                    Text(
+                        text = "Payment Method",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+
+                    PaymentMethod.all.forEach { payment ->
+
+                        val icon = when (payment) {
+                            "Cash" -> Icons.Default.Payments
+                            "UPI" -> Icons.Default.PhoneAndroid
+                            "Bank" -> Icons.Default.AccountBalance
+                            else -> Icons.Default.MoreHoriz
+                        }
+
+                        FilterChip(
+                            selected = method == payment,
+                            onClick = {
+                                method = payment
+                            },
+
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+
+                            label = {
+                                Text(
+                                    payment,
+                                    maxLines = 1
+                                )
+                            }
+                        )
+                    }
+                }
+
+                // Notes
+
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = {
+                        notes = it
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Text("Notes (Optional)")
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Notes,
+                            contentDescription = null
+                        )
+                    },
+                    minLines = 3,
+                    maxLines = 3,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
         },
+
+        confirmButton = {
+
+            Button(
+                onClick = {
+                    amount.toDoubleOrNull()?.let {
+                        onConfirm(it, method, notes)
+                    }
+                }
+            ) {
+
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null
+                )
+
+                Spacer(Modifier.width(6.dp))
+
+                Text("Save")
+            }
+        },
+
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+
+            OutlinedButton(
+                onClick = onDismiss
+            ) {
+
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = null
+                )
+
+                Spacer(Modifier.width(6.dp))
+
+                Text("Cancel")
+            }
         }
     )
 }

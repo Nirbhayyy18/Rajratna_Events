@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.Gson
 import com.rajratna.events.RajratnaApp
 import com.rajratna.events.data.database.AppDatabase
+import com.rajratna.events.data.repository.AppRepository
 import com.rajratna.events.data.repository.BackupData
 import com.rajratna.events.ui.components.SectionHeader
 import com.rajratna.events.util.DateUtils
@@ -64,23 +65,81 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+//    fun restoreBackup(context: Context, uri: Uri) {
+//        viewModelScope.launch {
+//            _state.value = _state.value.copy(isWorking = true, message = null)
+//            try {
+//                val json = withContext(Dispatchers.IO) {
+//                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: ""
+//                }
+//                val data = Gson().fromJson(json, BackupData::class.java)
+//                // Reset database and restore
+//                AppDatabase.resetInstance()
+//                val db = AppDatabase.getDatabase(context)
+//                db.clearAllTables()
+//                val newRepo = com.rajratna.events.data.repository.AppRepository(db.itemDao(), db.customerDao(), db.orderDao(), db.paymentDao())
+//                newRepo.restoreFromBackup(data)
+//                _state.value = _state.value.copy(isWorking = false, message = "Restore completed! Please restart the app.")
+//            } catch (e: Exception) {
+//                _state.value = _state.value.copy(isWorking = false, message = "Restore failed: ${e.message}")
+//            }
+//        }
+//    }
+
     fun restoreBackup(context: Context, uri: Uri) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isWorking = true, message = null)
+
+            _state.value = _state.value.copy(
+                isWorking = true,
+                message = null
+            )
+
             try {
+
+                // Read backup file
                 val json = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: ""
+                    context.contentResolver
+                        .openInputStream(uri)
+                        ?.bufferedReader()
+                        ?.readText()
+                        ?: ""
                 }
-                val data = Gson().fromJson(json, BackupData::class.java)
-                // Reset database and restore
-                AppDatabase.resetInstance()
-                val db = AppDatabase.getDatabase(context)
-                db.clearAllTables()
-                val newRepo = com.rajratna.events.data.repository.AppRepository(db.itemDao(), db.customerDao(), db.orderDao(), db.paymentDao())
-                newRepo.restoreFromBackup(data)
-                _state.value = _state.value.copy(isWorking = false, message = "Restore completed! Please restart the app.")
+
+                val data = Gson().fromJson(
+                    json,
+                    BackupData::class.java
+                )
+
+                // EVERYTHING database-related goes on IO
+                withContext(Dispatchers.IO) {
+
+                    AppDatabase.resetInstance()
+
+                    val db = AppDatabase.getDatabase(context)
+
+                    db.clearAllTables()
+
+                    val repository = AppRepository(
+                        db.itemDao(),
+                        db.customerDao(),
+                        db.orderDao(),
+                        db.paymentDao()
+                    )
+
+                    repository.restoreFromBackup(data)
+                }
+
+                _state.value = _state.value.copy(
+                    isWorking = false,
+                    message = "Restore completed! Please restart the app."
+                )
+
             } catch (e: Exception) {
-                _state.value = _state.value.copy(isWorking = false, message = "Restore failed: ${e.message}")
+
+                _state.value = _state.value.copy(
+                    isWorking = false,
+                    message = "Restore failed: ${e.message}"
+                )
             }
         }
     }
