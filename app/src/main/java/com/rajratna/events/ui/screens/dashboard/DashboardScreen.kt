@@ -222,13 +222,13 @@ fun DashboardScreen(
                     StockOverviewTable(state.itemStocks)
                 }
 
-                item {
-                    UpcomingDeliveriesSection(
-                        deliveries = state.upcomingDeliveries,
-                        onViewAll = onNavigateToOrders,
-                        onOpenOrder = onNavigateToOrderDetails
-                    )
-                }
+//                item {
+//                    UpcomingDeliveriesSection(
+//                        deliveries = state.upcomingDeliveries,
+//                        onViewAll = onNavigateToOrders,
+//                        onOpenOrder = onNavigateToOrderDetails
+//                    )
+//                }
             }
         }
     }
@@ -243,17 +243,17 @@ private fun OverviewCard(
     returns: Int,
     onPickDate: () -> Unit
 ) {
-    val dateLabel = if (date == DateUtils.startOfToday()) "Today" else DateUtils.formatShortDate(date)
+   // val dateLabel = if (date == DateUtils.startOfToday()) "Today" else DateUtils.formatShortDate(date)
     Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("Today's Overview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                AssistChip(
-                    onClick = onPickDate,
-                    label = { Text(dateLabel) },
-                    leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    trailingIcon = { Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                )
+//                AssistChip(
+//                    onClick = onPickDate,
+//                    label = { Text(dateLabel) },
+//                    leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp)) },
+//                    trailingIcon = { Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(16.dp)) }
+//                )
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MetricTile("Income Today", incomeToday.toRupee(), StatusCompleted, Icons.Default.Paid, Modifier.weight(1f))
@@ -415,7 +415,7 @@ private fun StockOverviewTable(items: List<ItemStockInfo>) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
                 Text("Item", modifier = Modifier.weight(1.3f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Total", modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Booked", modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.labelMedium, color = PaymentPartial)
+                Text("Out", modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.labelMedium, color = PaymentPartial)
                 Text("Available", modifier = Modifier.weight(0.9f), style = MaterialTheme.typography.labelMedium, color = StatusCompleted)
             }
             HorizontalDivider(color = Color(0xFFE8EAF1))
