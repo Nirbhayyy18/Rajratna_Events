@@ -46,14 +46,14 @@ fun OrderDetailsScreen(
     LaunchedEffect(showRecordReturnDialog, state.orderItems) {
         if (showRecordReturnDialog) {
             returnEntries = state.orderItems
-                .filter { !it.isCustomerOwned && it.quantity > it.returnedQuantity }
+                .filter { !it.isCustomerOwned && it.quantity > (it.returnedQuantity + it.damagedQuantity) }
                 .map { item ->
                     LocalReturnEntry(
                         orderItemId = item.id,
                         itemName = item.itemName,
                         quantity = item.quantity,
                         alreadyReturned = item.returnedQuantity,
-                        pendingQuantity = item.quantity - item.returnedQuantity,
+                        pendingQuantity = item.quantity - item.returnedQuantity - item.damagedQuantity,
                         returnedNow = 0
                     )
                 }
@@ -221,7 +221,7 @@ fun OrderDetailsScreen(
                                 Icon(Icons.Default.Payment, null); Spacer(Modifier.width(8.dp)); Text("Record Payment")
                             }
                         }
-                        val hasPendingReturns = state.orderItems.any { !it.isCustomerOwned && it.quantity > it.returnedQuantity }
+                        val hasPendingReturns = state.orderItems.any { !it.isCustomerOwned && it.quantity > (it.returnedQuantity + it.damagedQuantity) }
                         if ((order.orderStatus == OrderStatus.DELIVERED || order.orderStatus == OrderStatus.COMPLETED) && hasPendingReturns) {
                             Button(
                                 onClick = { showRecordReturnDialog = true },
@@ -252,7 +252,7 @@ fun OrderDetailsScreen(
                                         }
                                     }
                                     OrderStatus.COMPLETED -> {
-                                        val pendingItems = state.orderItems.filter { !it.isCustomerOwned && it.quantity > it.returnedQuantity }
+                                        val pendingItems = state.orderItems.filter { !it.isCustomerOwned && it.quantity > (it.returnedQuantity + it.damagedQuantity) }
                                         if (pendingItems.isNotEmpty()) {
                                             android.widget.Toast.makeText(context, "Please record item returns before completing this order.", android.widget.Toast.LENGTH_LONG).show()
                                             showRecordReturnDialog = true

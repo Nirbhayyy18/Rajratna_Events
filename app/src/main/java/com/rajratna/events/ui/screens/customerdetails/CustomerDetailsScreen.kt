@@ -1,5 +1,6 @@
 package com.rajratna.events.ui.screens.customerdetails
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,7 +17,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rajratna.events.data.entity.PaymentStatusType
+import com.rajratna.events.data.repository.JarEntry
 import com.rajratna.events.ui.components.*
+import com.rajratna.events.ui.theme.*
 import com.rajratna.events.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,6 +38,15 @@ fun CustomerDetailsScreen(
     val customer = state.customer
     val orders = state.orders
     val activeOrders = orders.filter { it.orderStatus != "Cancelled" }
+    val jarStats = state.jarStats
+
+    // Show action messages
+    LaunchedEffect(state.actionMessage) {
+        state.actionMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearActionMessage()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -67,7 +80,117 @@ fun CustomerDetailsScreen(
                         }
                     }
                 }
-                // Stats
+
+                // ── Jar Summary Card ────────────────────────────────
+                item {
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = TealContainer)
+                    ) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(
+                                "Jar Summary - This Month",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Teal40
+                            )
+                            Spacer(Modifier.height(12.dp))
+
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                JarSummaryItem("Jars", "${jarStats.thisMonthJarCount}", Teal40)
+                                JarSummaryItem("Amount", jarStats.thisMonthJarAmount.toRupee(), Teal40)
+                                JarSummaryItem("Paid", jarStats.thisMonthPaid.toRupee(), StatusCompleted)
+                                JarSummaryItem("Balance", jarStats.pendingBalance.toRupee(), if (jarStats.pendingBalance > 0) PaymentUnpaid else StatusCompleted)
+                            }
+
+                            if (jarStats.pendingReturnJars > 0) {
+                                Spacer(Modifier.height(8.dp))
+                                HorizontalDivider(color = Teal40.copy(alpha = 0.2f))
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.SwapHoriz, null, tint = StatusPending, modifier = Modifier.size(18.dp))
+                                    Text(
+                                        "Pending Return: ${jarStats.pendingReturnJars} jars",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = StatusPending
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Quick Action Buttons ─────────────────────────────
+                item {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // + Jar
+                        Button(
+                            onClick = { viewModel.openQuickJar() },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Teal40)
+                        ) {
+                            Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Jar", fontWeight = FontWeight.Bold)
+                        }
+
+                        // Return Jar
+                        if (jarStats.pendingReturnJars > 0) {
+                            OutlinedButton(
+                                onClick = { viewModel.openReturnJar() },
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.AssignmentReturn, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Return")
+                            }
+                        }
+
+                        // Record Payment
+                        if (jarStats.pendingBalance > 0) {
+                            OutlinedButton(
+                                onClick = { viewModel.openRecordPayment() },
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.Payment, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Pay")
+                            }
+                        }
+
+                        // WhatsApp Summary
+                        OutlinedButton(
+                            onClick = {
+                                val message = WhatsAppUtils.generateCustomerJarSummary(
+                                    customer.name,
+                                    jarStats.thisMonthJarCount,
+                                    jarStats.thisMonthJarAmount,
+                                    jarStats.totalPaid,
+                                    jarStats.pendingBalance,
+                                    jarStats.pendingReturnJars
+                                )
+                                WhatsAppUtils.shareOnWhatsApp(context, customer.mobileNumber, message)
+                            },
+                            modifier = Modifier.height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) {
+                            Icon(Icons.Default.Chat, null, Modifier.size(18.dp))
+                        }
+                    }
+                }
+
+                // ── Overall Stats ────────────────────────────────────
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         StatCard("Total Orders", orders.size.toString(), Icons.Default.Receipt, modifier = Modifier.weight(1f))
@@ -76,11 +199,20 @@ fun CustomerDetailsScreen(
                 }
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatCard("Paid", activeOrders.sumOf { it.grandTotal - it.balanceAmount }.toRupee(), Icons.Default.CheckCircle, iconTint = com.rajratna.events.ui.theme.StatusCompleted, modifier = Modifier.weight(1f))
-                        StatCard("Pending", activeOrders.sumOf { it.balanceAmount }.toRupee(), Icons.Default.Warning, iconTint = com.rajratna.events.ui.theme.PaymentUnpaid, modifier = Modifier.weight(1f))
+                        StatCard("Paid", activeOrders.sumOf { it.grandTotal - it.balanceAmount }.toRupee(), Icons.Default.CheckCircle, iconTint = StatusCompleted, modifier = Modifier.weight(1f))
+                        StatCard("Pending", activeOrders.sumOf { it.balanceAmount }.toRupee(), Icons.Default.Warning, iconTint = PaymentUnpaid, modifier = Modifier.weight(1f))
                     }
                 }
-                // Order history
+
+                // ── Recent Jar Entries ───────────────────────────────
+                if (state.recentJarEntries.isNotEmpty()) {
+                    item { SectionHeader("Recent Jar Entries") }
+                    items(state.recentJarEntries) { entry ->
+                        JarEntryCard(entry = entry, onClick = { onNavigateToOrder(entry.orderId) })
+                    }
+                }
+
+                // ── Order History ────────────────────────────────────
                 item { SectionHeader("Order History") }
                 if (orders.isEmpty()) {
                     item { EmptyState(Icons.Default.Receipt, "No orders", "Create the first order for this customer") }
@@ -101,6 +233,135 @@ fun CustomerDetailsScreen(
                     }
                 }
                 item { Spacer(Modifier.height(80.dp)) }
+            }
+        }
+    }
+
+    // ── Bottom Sheets ────────────────────────────────────────
+
+    if (state.showQuickJar && customer != null) {
+        QuickJarBottomSheet(
+            customer = customer,
+            jarStats = jarStats,
+            jarRate = state.waterJarRate,
+            availableStock = state.availableJarStock,
+            onSave = { quantity, isCustomerOwned, paidAmount, deliveryDate ->
+                viewModel.saveQuickJarEntry(quantity, isCustomerOwned, paidAmount, deliveryDate)
+            },
+            onDismiss = { viewModel.dismissQuickJar() }
+        )
+    }
+
+    if (state.showReturnJar && customer != null) {
+        ReturnJarBottomSheet(
+            customer = customer,
+            totalPendingJars = jarStats.pendingReturnJars,
+            onSave = { returnedNow, damagedNow ->
+                viewModel.saveJarReturn(returnedNow, damagedNow)
+            },
+            onDismiss = { viewModel.dismissReturnJar() }
+        )
+    }
+
+    if (state.showRecordPayment && customer != null) {
+        RecordPaymentBottomSheet(
+            customer = customer,
+            pendingAmount = jarStats.pendingBalance,
+            onSave = { amount, method ->
+                viewModel.saveLumpSumPayment(amount, method)
+            },
+            onDismiss = { viewModel.dismissRecordPayment() }
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// JAR SUMMARY ITEM
+// ═══════════════════════════════════════════════════════════
+
+@Composable
+private fun JarSummaryItem(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = color
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// JAR ENTRY CARD
+// ═══════════════════════════════════════════════════════════
+
+@Composable
+private fun JarEntryCard(
+    entry: JarEntry,
+    onClick: () -> Unit
+) {
+    val jarLabel = if (entry.isCustomerOwned) "customer jars" else "jars"
+    val paymentColor = when (entry.paymentStatus) {
+        PaymentStatusType.PAID -> StatusCompleted
+        PaymentStatusType.PARTIALLY_PAID -> StatusPending
+        else -> PaymentUnpaid
+    }
+    val paymentLabel = when (entry.paymentStatus) {
+        PaymentStatusType.PAID -> "paid"
+        PaymentStatusType.PARTIALLY_PAID -> "partial"
+        else -> "unpaid"
+    }
+
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            Modifier.padding(14.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Default.WaterDrop, null, tint = Teal40, modifier = Modifier.size(20.dp))
+                Column {
+                    Text(
+                        DateUtils.formatShortDate(entry.date),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "${entry.quantity} $jarLabel",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    entry.amount.toRupee(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    paymentLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = paymentColor,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }

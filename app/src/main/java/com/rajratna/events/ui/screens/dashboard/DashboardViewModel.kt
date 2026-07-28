@@ -186,8 +186,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         for (order in pendingReturnOrdersFromRepo) {
             val orderItems = repository.getOrderItemsList(order.id)
             val pendingItems = orderItems
-                .filter { !it.isCustomerOwned && it.quantity > it.returnedQuantity }
-                .map { PendingItemInfo(it.itemName, it.quantity - it.returnedQuantity) }
+                .filter { !it.isCustomerOwned && it.quantity > (it.returnedQuantity + it.damagedQuantity) }
+                .map { PendingItemInfo(it.itemName, it.quantity - it.returnedQuantity - it.damagedQuantity) }
 
             pendingReturns.add(PendingReturnPreview(
                 orderId = order.id,

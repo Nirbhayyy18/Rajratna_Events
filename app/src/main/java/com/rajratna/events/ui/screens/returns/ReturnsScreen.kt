@@ -322,7 +322,7 @@ private fun PendingReturnCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             pendingOrder.pendingItems.forEach { item ->
-                val pending = item.quantity - item.returnedQuantity
+                val pending = item.quantity - item.returnedQuantity - item.damagedQuantity
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

@@ -23,7 +23,7 @@ data class PendingReturnOrder(
     val isUpcoming: Boolean
 ) {
     val pendingItems: List<OrderItem>
-        get() = items.filter { it.quantity > it.returnedQuantity }
+        get() = items.filter { it.quantity > (it.returnedQuantity + it.damagedQuantity) }
 }
 
 /**
@@ -102,7 +102,7 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
             val returnedOrders = repository.getReturnedOrders()
             val returnedOrderModels = returnedOrders.map { order ->
                 val items = repository.getOrderItemsList(order.id).filter { !it.isCustomerOwned }
-                val fullyReturned = items.all { it.quantity <= it.returnedQuantity }
+                val fullyReturned = items.all { it.quantity <= (it.returnedQuantity + it.damagedQuantity) }
                 ReturnedOrder(
                     order = order,
                     items = items,
@@ -185,14 +185,14 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val items = repository.getOrderItemsList(orderId)
             val entries = items
-                .filter { !it.isCustomerOwned && it.quantity > it.returnedQuantity }
+                .filter { !it.isCustomerOwned && it.quantity > (it.returnedQuantity + it.damagedQuantity) }
                 .map { item ->
                     ReturnEntry(
                         orderItemId = item.id,
                         itemName = item.itemName,
                         givenQuantity = item.quantity,
                         alreadyReturned = item.returnedQuantity,
-                        pendingQuantity = item.quantity - item.returnedQuantity,
+                        pendingQuantity = item.quantity - item.returnedQuantity - item.damagedQuantity,
                         returnedNow = 0
                     )
                 }

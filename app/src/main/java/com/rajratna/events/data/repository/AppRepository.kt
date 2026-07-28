@@ -5,7 +5,9 @@ import com.rajratna.events.data.dao.ItemDao
 import com.rajratna.events.data.dao.OrderDao
 import com.rajratna.events.data.dao.PaymentDao
 import com.rajratna.events.data.entity.*
+import com.rajratna.events.util.DateUtils
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 /**
  * Single repository that wraps all DAOs.
@@ -134,7 +136,7 @@ class AppRepository(
                         val orderItems = itemsByOrder[order.id] ?: emptyList()
                         val match = orderItems.find { it.itemId == item.id }
                         if (match != null) {
-                            val pending = match.quantity - match.returnedQuantity
+                            val pending = match.quantity - match.returnedQuantity - match.damagedQuantity
                             if (pending > 0) {
                                 physicalOut += pending
                             }
@@ -157,7 +159,7 @@ class AppRepository(
                         val orderItems = itemsByOrder[order.id] ?: emptyList()
                         val match = orderItems.find { it.itemId == item.id }
                         if (match != null) {
-                            val pending = match.quantity - match.returnedQuantity
+                            val pending = match.quantity - match.returnedQuantity - match.damagedQuantity
                             if (pending > 0) {
                                 val orderDeliveryStart = com.rajratna.events.util.DateUtils.startOfDay(order.deliveryDate)
                                 val orderReturnStart = com.rajratna.events.util.DateUtils.startOfDay(order.returnDate)
@@ -212,7 +214,7 @@ class AppRepository(
                         val orderItems = itemsByOrder[order.id] ?: emptyList()
                         val match = orderItems.find { it.itemId == item.id }
                         if (match != null) {
-                            val pending = match.quantity - match.returnedQuantity
+                            val pending = match.quantity - match.returnedQuantity - match.damagedQuantity
                             if (pending > 0) {
                                 val orderDeliveryStart = com.rajratna.events.util.DateUtils.startOfDay(order.deliveryDate)
                                 val orderReturnStart = com.rajratna.events.util.DateUtils.startOfDay(order.returnDate)
@@ -347,6 +349,304 @@ class AppRepository(
         }
     }
 
+    /**
+     * Record return with damaged/missing jar tracking.
+     * Damaged jars reduce pending returns but do NOT return to available stock.
+     * Instead, the physical totalStock of the item is decreased.
+     */
+    suspend fun recordReturnWithDamaged(
+        orderId: Long,
+        returnEntries: Map<Long, Int>,
+        damagedEntries: Map<Long, Int>
+    ) {
+        val items = orderDao.getOrderItemsList(orderId)
+
+        for (item in items) {
+            val returnedNow = returnEntries[item.id] ?: 0
+            val damagedNow = damagedEntries[item.id] ?: 0
+            if (returnedNow <= 0 && damagedNow <= 0) continue
+
+            val maxPending = item.quantity - item.returnedQuantity - item.damagedQuantity
+            val totalProcessed = (returnedNow + damagedNow).coerceAtMost(maxPending)
+            val actualReturned = returnedNow.coerceAtMost(totalProcessed)
+            val actualDamaged = (totalProcessed - actualReturned).coerceAtMost(damagedNow)
+
+            val newReturned = item.returnedQuantity + actualReturned
+            val newDamaged = item.damagedQuantity + actualDamaged
+            orderDao.updateReturnedAndDamagedQuantity(item.id, newReturned, newDamaged)
+
+            // Reduce physical stock for damaged jars
+            if (actualDamaged > 0 && !item.isCustomerOwned) {
+                val dbItem = itemDao.getItemById(item.itemId)
+                if (dbItem != null) {
+                    val newStock = maxOf(0, dbItem.totalStock - actualDamaged)
+                    itemDao.updateItem(dbItem.copy(totalStock = newStock))
+                }
+            }
+        }
+
+        // Check if all items are fully returned/accounted for
+        if (orderDao.areAllItemsReturned(orderId)) {
+            orderDao.updateOrderStatus(orderId, OrderStatus.COMPLETED)
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // QUICK JAR ENTRY
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Find the "Water Jar" item from the database.
+     */
+    suspend fun getWaterJarItem(): Item? {
+        return itemDao.getAllItemsList().find { it.name.equals("Water Jar", ignoreCase = true) }
+    }
+
+    /**
+     * Create a quick jar entry as a normal Delivered order.
+     * Returns the created order ID.
+     */
+    suspend fun saveQuickJarEntry(
+        customer: Customer,
+        quantity: Int,
+        isCustomerOwned: Boolean,
+        paidAmount: Double,
+        deliveryDate: Long,
+        waterJarItem: Item
+    ): Long {
+        val totalAmount = quantity * waterJarItem.ratePerDay
+        val paymentStatus = when {
+            paidAmount >= totalAmount -> PaymentStatusType.PAID
+            paidAmount > 0 -> PaymentStatusType.PARTIALLY_PAID
+            else -> PaymentStatusType.UNPAID
+        }
+
+        val order = Order(
+            customerId = customer.id,
+            customerName = customer.name,
+            customerMobile = customer.mobileNumber,
+            customerAddress = customer.address,
+            orderDate = deliveryDate,
+            deliveryDate = deliveryDate,
+            returnDate = deliveryDate + 24 * 60 * 60 * 1000L,
+            rentalDays = 1,
+            notes = if (isCustomerOwned) "Quick Jar Entry (Customer Jar)" else "Quick Jar Entry",
+            itemsTotal = totalAmount,
+            transportRent = 0.0,
+            grandTotal = totalAmount,
+            advancePaid = paidAmount,
+            balanceAmount = totalAmount - paidAmount,
+            orderStatus = OrderStatus.DELIVERED,
+            paymentStatus = paymentStatus
+        )
+
+        val orderItem = OrderItem(
+            orderId = 0,
+            itemId = waterJarItem.id,
+            itemName = waterJarItem.name,
+            quantity = quantity,
+            ratePerDay = waterJarItem.ratePerDay,
+            rentalDays = 1,
+            totalAmount = totalAmount,
+            isCustomerOwned = isCustomerOwned
+        )
+
+        val orderId = createOrder(order, listOf(orderItem))
+
+        // Record payment if paid
+        if (paidAmount > 0) {
+            recordPayment(
+                Payment(
+                    orderId = orderId,
+                    customerName = customer.name,
+                    customerMobile = customer.mobileNumber,
+                    amount = paidAmount,
+                    paymentDate = System.currentTimeMillis(),
+                    paymentMethod = PaymentMethod.CASH,
+                    notes = "Quick Jar Entry payment"
+                )
+            )
+        }
+
+        return orderId
+    }
+
+    /**
+     * Record a lump sum payment for a customer, allocating to oldest unpaid orders first.
+     */
+    suspend fun recordLumpSumPayment(
+        customer: Customer,
+        amount: Double,
+        paymentMethod: String
+    ) {
+        // Get all unpaid/partially-paid orders for this customer, oldest first
+        val customerOrders = orderDao.getAllOrdersList()
+            .filter { it.customerId == customer.id && it.orderStatus != OrderStatus.CANCELLED }
+            .filter { it.balanceAmount > 0 }
+            .sortedBy { it.deliveryDate }
+
+        var remaining = amount
+
+        for (order in customerOrders) {
+            if (remaining <= 0) break
+
+            val payForThis = minOf(remaining, order.balanceAmount)
+            recordPayment(
+                Payment(
+                    orderId = order.id,
+                    customerName = customer.name,
+                    customerMobile = customer.mobileNumber,
+                    amount = payForThis,
+                    paymentDate = System.currentTimeMillis(),
+                    paymentMethod = paymentMethod,
+                    notes = "Lump sum payment"
+                )
+            )
+            remaining -= payForThis
+        }
+    }
+
+    /**
+     * Get customer jar summary stats for current month.
+     */
+    suspend fun getCustomerJarStats(customerId: Long): CustomerJarStats {
+        val monthStart = DateUtils.startOfThisMonth()
+        val monthEnd = DateUtils.endOfThisMonth()
+
+        val allOrders = orderDao.getAllOrdersList()
+            .filter { it.customerId == customerId && it.orderStatus != OrderStatus.CANCELLED }
+
+        val monthOrders = allOrders.filter { it.deliveryDate in monthStart until monthEnd }
+
+        val allOrderItems = orderDao.getAllOrderItemsList()
+        val orderItemsByOrder = allOrderItems.groupBy { it.orderId }
+
+        // This month jar count (Water Jar only)
+        var thisMonthJarCount = 0
+        var thisMonthJarAmount = 0.0
+        for (order in monthOrders) {
+            val items = orderItemsByOrder[order.id] ?: emptyList()
+            for (item in items) {
+                if (item.itemName.equals("Water Jar", ignoreCase = true)) {
+                    thisMonthJarCount += item.quantity
+                    thisMonthJarAmount += item.totalAmount
+                }
+            }
+        }
+
+        // Total paid for this customer
+        val totalOrderAmount = allOrders.sumOf { it.grandTotal }
+        val pendingBalance = allOrders.sumOf { it.balanceAmount }
+        val paidAmount = totalOrderAmount - pendingBalance
+
+        // Pending return jars (Our Jar only, across all active orders)
+        var pendingReturnJars = 0
+        for (order in allOrders) {
+            if (order.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED)) {
+                val items = orderItemsByOrder[order.id] ?: emptyList()
+                for (item in items) {
+                    if (item.itemName.equals("Water Jar", ignoreCase = true) && !item.isCustomerOwned) {
+                        val pending = item.quantity - item.returnedQuantity - item.damagedQuantity
+                        if (pending > 0) pendingReturnJars += pending
+                    }
+                }
+            }
+        }
+
+        // Last jar entry
+        var lastJarQuantity = 0
+        var lastJarDate = 0L
+        var lastJarIsCustomerOwned = false
+        val sortedOrders = allOrders.sortedByDescending { it.deliveryDate }
+        for (order in sortedOrders) {
+            val items = orderItemsByOrder[order.id] ?: emptyList()
+            val jarItem = items.find { it.itemName.equals("Water Jar", ignoreCase = true) }
+            if (jarItem != null) {
+                lastJarQuantity = jarItem.quantity
+                lastJarDate = order.deliveryDate
+                lastJarIsCustomerOwned = jarItem.isCustomerOwned
+                break
+            }
+        }
+
+        // This month paid
+        val thisMonthPaid = monthOrders.sumOf { it.grandTotal - it.balanceAmount }
+
+        return CustomerJarStats(
+            thisMonthJarCount = thisMonthJarCount,
+            thisMonthJarAmount = thisMonthJarAmount,
+            thisMonthPaid = thisMonthPaid,
+            totalPaid = paidAmount,
+            pendingBalance = pendingBalance,
+            pendingReturnJars = pendingReturnJars,
+            lastJarQuantity = lastJarQuantity,
+            lastJarDate = lastJarDate,
+            lastJarIsCustomerOwned = lastJarIsCustomerOwned
+        )
+    }
+
+    /**
+     * Get pending return jar order items for a customer (Water Jar, Our Jar only).
+     */
+    suspend fun getCustomerPendingJarReturns(customerId: Long): List<PendingJarReturn> {
+        val allOrders = orderDao.getAllOrdersList()
+            .filter { it.customerId == customerId && it.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED) }
+        val allOrderItems = orderDao.getAllOrderItemsList()
+        val orderItemsByOrder = allOrderItems.groupBy { it.orderId }
+
+        val results = mutableListOf<PendingJarReturn>()
+        for (order in allOrders) {
+            val items = orderItemsByOrder[order.id] ?: emptyList()
+            for (item in items) {
+                if (item.itemName.equals("Water Jar", ignoreCase = true) && !item.isCustomerOwned) {
+                    val pending = item.quantity - item.returnedQuantity - item.damagedQuantity
+                    if (pending > 0) {
+                        results.add(PendingJarReturn(
+                            orderId = order.id,
+                            orderItemId = item.id,
+                            deliveryDate = order.deliveryDate,
+                            totalQuantity = item.quantity,
+                            returnedQuantity = item.returnedQuantity,
+                            damagedQuantity = item.damagedQuantity,
+                            pendingQuantity = pending
+                        ))
+                    }
+                }
+            }
+        }
+        return results.sortedBy { it.deliveryDate }
+    }
+
+    /**
+     * Get recent jar entries for a customer (for detail screen).
+     */
+    suspend fun getRecentJarEntries(customerId: Long, limit: Int = 20): List<JarEntry> {
+        val allOrders = orderDao.getAllOrdersList()
+            .filter { it.customerId == customerId && it.orderStatus != OrderStatus.CANCELLED }
+            .sortedByDescending { it.deliveryDate }
+
+        val allOrderItems = orderDao.getAllOrderItemsList()
+        val orderItemsByOrder = allOrderItems.groupBy { it.orderId }
+
+        val results = mutableListOf<JarEntry>()
+        for (order in allOrders) {
+            val items = orderItemsByOrder[order.id] ?: emptyList()
+            val jarItem = items.find { it.itemName.equals("Water Jar", ignoreCase = true) }
+            if (jarItem != null) {
+                results.add(JarEntry(
+                    orderId = order.id,
+                    date = order.deliveryDate,
+                    quantity = jarItem.quantity,
+                    amount = jarItem.totalAmount,
+                    isCustomerOwned = jarItem.isCustomerOwned,
+                    paymentStatus = order.paymentStatus
+                ))
+                if (results.size >= limit) break
+            }
+        }
+        return results
+    }
+
     // ══════════════════════════════════════════════════════════
     // PAYMENTS
     // ══════════════════════════════════════════════════════════
@@ -408,4 +708,44 @@ data class BackupData(
     val payments: List<Payment> = emptyList(),
     val backupTimestamp: Long = System.currentTimeMillis(),
     val appVersion: String = "1.0"
+)
+
+/**
+ * Customer jar summary stats.
+ */
+data class CustomerJarStats(
+    val thisMonthJarCount: Int = 0,
+    val thisMonthJarAmount: Double = 0.0,
+    val thisMonthPaid: Double = 0.0,
+    val totalPaid: Double = 0.0,
+    val pendingBalance: Double = 0.0,
+    val pendingReturnJars: Int = 0,
+    val lastJarQuantity: Int = 0,
+    val lastJarDate: Long = 0L,
+    val lastJarIsCustomerOwned: Boolean = false
+)
+
+/**
+ * Pending jar return entry for a customer.
+ */
+data class PendingJarReturn(
+    val orderId: Long,
+    val orderItemId: Long,
+    val deliveryDate: Long,
+    val totalQuantity: Int,
+    val returnedQuantity: Int,
+    val damagedQuantity: Int,
+    val pendingQuantity: Int
+)
+
+/**
+ * Jar entry for recent history display.
+ */
+data class JarEntry(
+    val orderId: Long,
+    val date: Long,
+    val quantity: Int,
+    val amount: Double,
+    val isCustomerOwned: Boolean,
+    val paymentStatus: String
 )

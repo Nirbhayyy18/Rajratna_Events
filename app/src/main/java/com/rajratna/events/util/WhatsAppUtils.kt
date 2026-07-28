@@ -89,7 +89,7 @@ Balance: ${order.balanceAmount.toInt()} rs
         sb.appendLine()
         sb.appendLine("Pending items:")
         pendingItems.forEach { item ->
-            val pending = item.quantity - item.returnedQuantity
+            val pending = item.quantity - item.returnedQuantity - item.damagedQuantity
             if (pending > 0) {
                 sb.appendLine("${item.itemName}: $pending")
             }
@@ -184,6 +184,34 @@ Balance: ${order.balanceAmount.toInt()} rs
         intent.data = Uri.parse("tel:$phoneNumber")
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         context.startActivity(intent)
+    }
+
+    /**
+     * Generate jar/payment summary for WhatsApp sharing.
+     * Answers customer questions like "kiti jar zale total?", "balance kiti aahe?"
+     */
+    fun generateCustomerJarSummary(
+        customerName: String,
+        thisMonthJarCount: Int,
+        thisMonthJarAmount: Double,
+        paidAmount: Double,
+        pendingBalance: Double,
+        pendingReturnJars: Int
+    ): String {
+        val sb = StringBuilder()
+        sb.appendLine("Rajratna Events")
+        sb.appendLine()
+        sb.appendLine(customerName)
+        sb.appendLine("This Month Jar Summary")
+        sb.appendLine()
+        sb.appendLine("Total Jars: $thisMonthJarCount")
+        sb.appendLine("Total Amount: ₹${thisMonthJarAmount.toInt()}")
+        sb.appendLine("Paid: ₹${paidAmount.toInt()}")
+        sb.appendLine("Balance: ₹${pendingBalance.toInt()}")
+        if (pendingReturnJars > 0) {
+            sb.appendLine("Pending Return: $pendingReturnJars jars")
+        }
+        return sb.toString()
     }
 }
 

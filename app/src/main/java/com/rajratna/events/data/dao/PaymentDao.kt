@@ -31,3 +31,4 @@ interface PaymentDao {
     @Query("SELECT * FROM payments")
     suspend fun getAllPaymentsList(): List<Payment>
 }
+

@@ -132,11 +132,11 @@ interface OrderDao {
      * Only counts orders that are active (not completed/cancelled).
      */
     @Query("""
-        SELECT oi.itemId, COALESCE(SUM(oi.quantity - oi.returnedQuantity), 0) AS totalRented
+        SELECT oi.itemId, COALESCE(SUM(oi.quantity - oi.returnedQuantity - oi.damagedQuantity), 0) AS totalRented
         FROM order_items oi
         INNER JOIN orders o ON oi.orderId = o.id
         WHERE o.orderStatus IN ('Confirmed', 'Delivered')
-        AND (oi.quantity - oi.returnedQuantity) > 0
+        AND (oi.quantity - oi.returnedQuantity - oi.damagedQuantity) > 0
         AND oi.isCustomerOwned = 0
         GROUP BY oi.itemId
     """)
@@ -151,12 +151,18 @@ interface OrderDao {
     suspend fun updateReturnedQuantity(orderItemId: Long, returnedQuantity: Int)
 
     /**
+     * Update both returned and damaged quantities for a specific order item.
+     */
+    @Query("UPDATE order_items SET returnedQuantity = :returnedQuantity, damagedQuantity = :damagedQuantity WHERE id = :orderItemId")
+    suspend fun updateReturnedAndDamagedQuantity(orderItemId: Long, returnedQuantity: Int, damagedQuantity: Int)
+
+    /**
      * Check if all items in an order are fully returned.
      */
     @Query("""
         SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END
         FROM order_items
-        WHERE orderId = :orderId AND quantity > returnedQuantity AND isCustomerOwned = 0
+        WHERE orderId = :orderId AND quantity > (returnedQuantity + damagedQuantity) AND isCustomerOwned = 0
     """)
     suspend fun areAllItemsReturned(orderId: Long): Boolean
 
@@ -168,7 +174,7 @@ interface OrderDao {
         SELECT DISTINCT o.* FROM orders o
         INNER JOIN order_items oi ON o.id = oi.orderId
         WHERE o.orderStatus IN ('Confirmed', 'Delivered', 'Completed')
-        AND oi.quantity > oi.returnedQuantity
+        AND oi.quantity > (oi.returnedQuantity + oi.damagedQuantity)
         AND oi.isCustomerOwned = 0
         ORDER BY o.returnDate ASC
     """)
@@ -181,7 +187,7 @@ interface OrderDao {
         SELECT DISTINCT o.* FROM orders o
         INNER JOIN order_items oi ON o.id = oi.orderId
         WHERE o.orderStatus IN ('Confirmed', 'Delivered', 'Completed')
-        AND oi.quantity > oi.returnedQuantity
+        AND oi.quantity > (oi.returnedQuantity + oi.damagedQuantity)
         AND o.returnDate <= :endOfToday
         AND oi.isCustomerOwned = 0
         ORDER BY o.returnDate ASC
@@ -196,7 +202,7 @@ interface OrderDao {
         SELECT COUNT(DISTINCT o.id) FROM orders o
         INNER JOIN order_items oi ON o.id = oi.orderId
         WHERE o.orderStatus IN ('Confirmed', 'Delivered', 'Completed')
-        AND oi.quantity > oi.returnedQuantity
+        AND oi.quantity > (oi.returnedQuantity + oi.damagedQuantity)
         AND o.returnDate <= :endOfToday
         AND oi.isCustomerOwned = 0
     """)
@@ -271,12 +277,12 @@ interface OrderDao {
      * where selected date falls within the rental period (delivery to return).
      */
     @Query("""
-        SELECT oi.itemId, COALESCE(SUM(oi.quantity - oi.returnedQuantity), 0) AS totalRented
+        SELECT oi.itemId, COALESCE(SUM(oi.quantity - oi.returnedQuantity - oi.damagedQuantity), 0) AS totalRented
         FROM order_items oi
         INNER JOIN orders o ON oi.orderId = o.id
         WHERE o.orderStatus IN ('Confirmed', 'Delivered')
         AND o.deliveryDate <= :selectedDate
-        AND (oi.quantity - oi.returnedQuantity) > 0
+        AND (oi.quantity - oi.returnedQuantity - oi.damagedQuantity) > 0
         AND oi.isCustomerOwned = 0
         GROUP BY oi.itemId
     """)
@@ -286,13 +292,13 @@ interface OrderDao {
      * Date-wise rented quantities excluding a specific order (for edit mode validation).
      */
     @Query("""
-        SELECT oi.itemId, COALESCE(SUM(oi.quantity - oi.returnedQuantity), 0) AS totalRented
+        SELECT oi.itemId, COALESCE(SUM(oi.quantity - oi.returnedQuantity - oi.damagedQuantity), 0) AS totalRented
         FROM order_items oi
         INNER JOIN orders o ON oi.orderId = o.id
         WHERE o.orderStatus IN ('Confirmed', 'Delivered')
         AND o.id != :excludeOrderId
         AND o.deliveryDate <= :selectedDate
-        AND (oi.quantity - oi.returnedQuantity) > 0
+        AND (oi.quantity - oi.returnedQuantity - oi.damagedQuantity) > 0
         AND oi.isCustomerOwned = 0
         GROUP BY oi.itemId
     """)
