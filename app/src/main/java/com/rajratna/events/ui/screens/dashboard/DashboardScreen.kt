@@ -3,6 +3,7 @@ package com.rajratna.events.ui.screens.dashboard
 import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,9 +62,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.rajratna.events.ui.theme.PaymentPartial
-import com.rajratna.events.ui.theme.PaymentUnpaid
-import com.rajratna.events.ui.theme.StatusCompleted
+import com.rajratna.events.ui.components.ThemeToggleButton
+import com.rajratna.events.ui.theme.*
 import com.rajratna.events.util.DateUtils
 import com.rajratna.events.util.toRupee
 import java.util.Calendar
@@ -79,6 +79,8 @@ fun DashboardScreen(
     onNavigateToPayments: () -> Unit,
     onNavigateToReports: () -> Unit,
     onNavigateToOrderDetails: (Long) -> Unit,
+    currentTheme: ThemeMode = ThemeMode.SYSTEM,
+    onCycleTheme: () -> Unit = {},
     viewModel: DashboardViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -87,7 +89,7 @@ fun DashboardScreen(
     LaunchedEffect(Unit) { viewModel.loadDashboard() }
 
     Scaffold(
-        containerColor = Color(0xFFF6F7FB),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -98,14 +100,18 @@ fun DashboardScreen(
                     )
                 },
                 actions = {
-//                    IconButton(onClick = onNavigateToItems) {
-//                        Icon(Icons.Outlined.Inventory2, contentDescription = "Inventory")
-//                    }
+                    // Theme toggle — cycles SYSTEM → LIGHT → DARK → SYSTEM
+                    ThemeToggleButton(
+                        currentMode  = currentTheme,
+                        onCycleTheme = onCycleTheme
+                    )
                     IconButton(onClick = onNavigateToBackup) {
                         Icon(Icons.Outlined.Backup, contentDescription = "Backup")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF6F7FB))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         },
         floatingActionButton = {
@@ -271,7 +277,7 @@ private fun OverviewCard(
 private fun MetricTile(label: String, value: String, valueColor: Color, icon: ImageVector, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        color = Color(0xFFF9FAFC),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(14.dp),
         tonalElevation = 0.dp
     ) {
@@ -344,7 +350,7 @@ private fun AlertsCard(alerts: List<DashboardAlertInfo>, onClick: (DashboardAler
         Column {
             alerts.forEachIndexed { index, alert ->
                 AlertRow(alert = alert, onClick = { onClick(alert.type) })
-                if (index != alerts.lastIndex) HorizontalDivider(color = Color(0xFFE8EAF1))
+                if (index != alerts.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
     }
@@ -352,11 +358,28 @@ private fun AlertsCard(alerts: List<DashboardAlertInfo>, onClick: (DashboardAler
 
 @Composable
 private fun AlertRow(alert: DashboardAlertInfo, onClick: () -> Unit) {
+    val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.3f
     val iconData = when (alert.type) {
-        DashboardAlertType.OVERDUE_RETURNS -> Triple(Icons.Default.WarningAmber, Color(0xFFFFEFEF), Color(0xFFD63939))
-        DashboardAlertType.PENDING_PAYMENTS -> Triple(Icons.Default.Payment, Color(0xFFFFF6EA), Color(0xFFDB7A00))
-        DashboardAlertType.LOW_STOCK -> Triple(Icons.Default.Inventory2, Color(0xFFEFF4FF), Color(0xFF1E5CC8))
-        DashboardAlertType.TOMORROW_BOOKINGS -> Triple(Icons.Default.Schedule, Color(0xFFEFFAF3), Color(0xFF2F9B50))
+        DashboardAlertType.OVERDUE_RETURNS   -> Triple(
+            Icons.Default.WarningAmber,
+            if (isDark) AlertOverdueIconBgDark  else AlertOverdueIconBg,
+            if (isDark) AlertOverdueIconColor   else AlertOverdueIconColor
+        )
+        DashboardAlertType.PENDING_PAYMENTS  -> Triple(
+            Icons.Default.Payment,
+            if (isDark) AlertPaymentIconBgDark  else AlertPaymentIconBg,
+            if (isDark) AlertPaymentIconColor   else AlertPaymentIconColor
+        )
+        DashboardAlertType.LOW_STOCK         -> Triple(
+            Icons.Default.Inventory2,
+            if (isDark) AlertStockIconBgDark    else AlertStockIconBg,
+            if (isDark) AlertStockIconColor     else AlertStockIconColor
+        )
+        DashboardAlertType.TOMORROW_BOOKINGS -> Triple(
+            Icons.Default.Schedule,
+            if (isDark) AlertBookingIconBgDark  else AlertBookingIconBg,
+            if (isDark) AlertBookingIconColor   else AlertBookingIconColor
+        )
     }
     val title = when (alert.type) {
         DashboardAlertType.OVERDUE_RETURNS -> "Overdue Returns"
@@ -413,20 +436,20 @@ private fun StockOverviewTable(items: List<ItemStockInfo>) {
     Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
-                Text("Item", modifier = Modifier.weight(1.3f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Total", modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Out", modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.labelMedium, color = PaymentPartial)
+                Text("Item",      modifier = Modifier.weight(1.3f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Total",     modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Out",       modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.labelMedium, color = PaymentPartial)
                 Text("Available", modifier = Modifier.weight(0.9f), style = MaterialTheme.typography.labelMedium, color = StatusCompleted)
             }
-            HorizontalDivider(color = Color(0xFFE8EAF1))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             items.forEachIndexed { index, item ->
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(item.name, modifier = Modifier.weight(1.3f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(item.totalStock.toString(), modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.bodyMedium)
                     Text(item.outStock.toString(), modifier = Modifier.weight(0.8f), style = MaterialTheme.typography.bodyMedium, color = if (item.outStock > 0) PaymentPartial else MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(item.availableStock.toString(), modifier = Modifier.weight(0.9f), style = MaterialTheme.typography.bodyMedium, color = if (item.isLowStock) Color(0xFFD63939) else StatusCompleted, fontWeight = FontWeight.SemiBold)
+                    Text(item.availableStock.toString(), modifier = Modifier.weight(0.9f), style = MaterialTheme.typography.bodyMedium, color = if (item.isLowStock) StatusCancelled else StatusCompleted, fontWeight = FontWeight.SemiBold)
                 }
-                if (index != items.lastIndex) HorizontalDivider(color = Color(0xFFF1F2F7))
+                if (index != items.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             }
         }
     }
@@ -473,11 +496,11 @@ private fun UpcomingDeliveriesSection(
                                 Text(delivery.customerName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(delivery.itemSummary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                            Surface(color = Color(0xFFEFF4FF), shape = RoundedCornerShape(50)) {
-                                Text("Delivery", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                            Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(50)) {
+                                Text("Delivery", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.SemiBold)
                             }
                         }
-                        if (index != deliveries.lastIndex) HorizontalDivider(color = Color(0xFFE8EAF1))
+                        if (index != deliveries.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
             }

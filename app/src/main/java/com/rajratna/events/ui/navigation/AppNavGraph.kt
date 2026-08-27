@@ -20,33 +20,41 @@ import com.rajratna.events.ui.screens.orders.OrdersListScreen
 import com.rajratna.events.ui.screens.payments.PaymentsScreen
 import com.rajratna.events.ui.screens.reports.ReportsScreen
 import com.rajratna.events.ui.screens.returns.ReturnsScreen
+import com.rajratna.events.ui.theme.ThemeMode
 
 @Composable
-fun AppNavGraph(navController: NavHostController, modifier: Modifier = Modifier) {
+fun AppNavGraph(
+    navController: NavHostController,
+    currentTheme: ThemeMode,
+    onCycleTheme: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     NavHost(
-        navController = navController,
+        navController    = navController,
         startDestination = Screen.Dashboard.route,
-        modifier = modifier
+        modifier         = modifier
     ) {
         // Dashboard
         composable(Screen.Dashboard.route) {
             DashboardScreen(
-                onNavigateToNewOrder = { navController.navigate(Screen.NewOrder.route) },
-                onNavigateToOrders = { navController.navigate(Screen.OrdersList.route) },
-                onNavigateToItems = { navController.navigate(Screen.ItemsRates.route) },
-                onNavigateToBackup = { navController.navigate(Screen.Backup.route) },
-                onNavigateToPayments = { navController.navigate(Screen.Payments.route) },
-                onNavigateToReports = { navController.navigate(Screen.Reports.route) },
-                onNavigateToReturns = {
+                onNavigateToNewOrder    = { navController.navigate(Screen.NewOrder.route) },
+                onNavigateToOrders      = { navController.navigate(Screen.OrdersList.route) },
+                onNavigateToItems       = { navController.navigate(Screen.ItemsRates.route) },
+                onNavigateToBackup      = { navController.navigate(Screen.Backup.route) },
+                onNavigateToPayments    = { navController.navigate(Screen.Payments.route) },
+                onNavigateToReports     = { navController.navigate(Screen.Reports.route) },
+                onNavigateToReturns     = {
                     navController.navigate(Screen.Returns.route) {
                         popUpTo(navController.graph.startDestinationId) { saveState = true }
                         launchSingleTop = true
-                        restoreState = true
+                        restoreState    = true
                     }
                 },
                 onNavigateToOrderDetails = { orderId ->
                     navController.navigate(Screen.OrderDetails.createRoute(orderId))
-                }
+                },
+                currentTheme  = currentTheme,
+                onCycleTheme  = onCycleTheme
             )
         }
 
@@ -54,7 +62,7 @@ fun AppNavGraph(navController: NavHostController, modifier: Modifier = Modifier)
         composable(Screen.NewOrder.route) {
             NewOrderScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onOrderSaved = { orderId ->
+                onOrderSaved   = { orderId ->
                     navController.popBackStack()
                     navController.navigate(Screen.OrderDetails.createRoute(orderId))
                 }
@@ -63,48 +71,48 @@ fun AppNavGraph(navController: NavHostController, modifier: Modifier = Modifier)
 
         // Edit Order
         composable(
-            route = Screen.EditOrder.route,
+            route     = Screen.EditOrder.route,
             arguments = listOf(navArgument("orderId") { type = NavType.LongType })
         ) { backStackEntry ->
             val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
             NewOrderScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onOrderSaved = { navController.popBackStack() },
-                editOrderId = orderId
+                onOrderSaved   = { navController.popBackStack() },
+                editOrderId    = orderId
             )
         }
 
         // Orders List
         composable(Screen.OrdersList.route) {
             OrdersListScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToOrder = { navController.navigate(Screen.OrderDetails.createRoute(it)) },
+                onNavigateBack     = { navController.popBackStack() },
+                onNavigateToOrder  = { navController.navigate(Screen.OrderDetails.createRoute(it)) },
                 onNavigateToNewOrder = { navController.navigate(Screen.NewOrder.route) }
             )
         }
 
         // Order Details
         composable(
-            route = Screen.OrderDetails.route,
+            route     = Screen.OrderDetails.route,
             arguments = listOf(navArgument("orderId") { type = NavType.LongType })
         ) { backStackEntry ->
             val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
             OrderDetailsScreen(
-                orderId = orderId,
-                onNavigateBack = { navController.popBackStack() },
-                onEditOrder = { navController.navigate(Screen.EditOrder.createRoute(it)) },
+                orderId             = orderId,
+                onNavigateBack      = { navController.popBackStack() },
+                onEditOrder         = { navController.navigate(Screen.EditOrder.createRoute(it)) },
                 onNavigateToBillPreview = { navController.navigate(Screen.BillPreview.createRoute(it)) }
             )
         }
 
         // Bill Preview
         composable(
-            route = Screen.BillPreview.route,
+            route     = Screen.BillPreview.route,
             arguments = listOf(navArgument("orderId") { type = NavType.LongType })
         ) { backStackEntry ->
             val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
             BillPreviewScreen(
-                orderId = orderId,
+                orderId        = orderId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -121,21 +129,21 @@ fun AppNavGraph(navController: NavHostController, modifier: Modifier = Modifier)
         // Customers
         composable(Screen.Customers.route) {
             CustomersScreen(
-                onNavigateBack = { navController.popBackStack() },
+                onNavigateBack     = { navController.popBackStack() },
                 onNavigateToCustomer = { navController.navigate(Screen.CustomerDetails.createRoute(it)) }
             )
         }
 
         // Customer Details
         composable(
-            route = Screen.CustomerDetails.route,
+            route     = Screen.CustomerDetails.route,
             arguments = listOf(navArgument("customerId") { type = NavType.LongType })
         ) { backStackEntry ->
             val customerId = backStackEntry.arguments?.getLong("customerId") ?: 0L
             CustomerDetailsScreen(
-                customerId = customerId,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToOrder = { navController.navigate(Screen.OrderDetails.createRoute(it)) },
+                customerId          = customerId,
+                onNavigateBack      = { navController.popBackStack() },
+                onNavigateToOrder   = { navController.navigate(Screen.OrderDetails.createRoute(it)) },
                 onNavigateToNewOrder = { navController.navigate(Screen.NewOrder.route) }
             )
         }
@@ -143,7 +151,7 @@ fun AppNavGraph(navController: NavHostController, modifier: Modifier = Modifier)
         // Payments
         composable(Screen.Payments.route) {
             PaymentsScreen(
-                onNavigateBack = { navController.popBackStack() },
+                onNavigateBack    = { navController.popBackStack() },
                 onNavigateToOrder = { navController.navigate(Screen.OrderDetails.createRoute(it)) }
             )
         }
@@ -167,9 +175,9 @@ fun AppNavGraph(navController: NavHostController, modifier: Modifier = Modifier)
         composable(Screen.More.route) {
             MoreScreen(
                 onNavigateToCustomers = { navController.navigate(Screen.Customers.route) },
-                onNavigateToPayments = { navController.navigate(Screen.Payments.route) },
-                onNavigateToReports = { navController.navigate(Screen.Reports.route) },
-                onNavigateToBackup = { navController.navigate(Screen.Backup.route) }
+                onNavigateToPayments  = { navController.navigate(Screen.Payments.route) },
+                onNavigateToReports   = { navController.navigate(Screen.Reports.route) },
+                onNavigateToBackup    = { navController.navigate(Screen.Backup.route) }
             )
         }
     }

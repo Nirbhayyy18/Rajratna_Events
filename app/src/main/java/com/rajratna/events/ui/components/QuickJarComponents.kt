@@ -83,10 +83,12 @@ fun QuickJarBottomSheet(
                     Text("Customer: ${customer.name}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                     Text("Mobile: ${customer.mobileNumber}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (jarStats.pendingBalance > 0) {
-                        Text("Balance: ${jarStats.pendingBalance.toRupee()}", style = MaterialTheme.typography.bodyMedium, color = PaymentUnpaid, fontWeight = FontWeight.SemiBold)
+                        val isDark = MaterialTheme.colorScheme.background.red < 0.3f
+                        Text("Balance: ${jarStats.pendingBalance.toRupee()}", style = MaterialTheme.typography.bodyMedium, color = getStatusColors(PaymentStatusType.UNPAID, isDark).second, fontWeight = FontWeight.SemiBold)
                     }
                     if (jarStats.pendingReturnJars > 0) {
-                        Text("Pending Return: ${jarStats.pendingReturnJars} jars", style = MaterialTheme.typography.bodyMedium, color = StatusPending)
+                        val isDark = MaterialTheme.colorScheme.background.red < 0.3f
+                        Text("Pending Return: ${jarStats.pendingReturnJars} jars", style = MaterialTheme.typography.bodyMedium, color = getStatusColors(OrderStatus.PENDING, isDark).second)
                     }
                     if (jarStats.lastJarQuantity > 0) {
                         Text("Last: ${jarStats.lastJarQuantity} jars on ${DateUtils.formatShortDate(jarStats.lastJarDate)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -145,28 +147,30 @@ fun QuickJarBottomSheet(
             if (effectiveQuantity > 0) {
                 Card(
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = TealContainer)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 ) {
                     Row(
                         Modifier.fillMaxWidth().padding(12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("₹${jarRate.toInt()} × $effectiveQuantity", style = MaterialTheme.typography.bodyLarge)
-                        Text("= ${totalAmount.toRupee()}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = Teal40)
+                        Text("₹${jarRate.toInt()} × $effectiveQuantity", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text("= ${totalAmount.toRupee()}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
 
             // Stock warning (only for Our Jar)
             if (!isCustomerOwned && effectiveQuantity > availableStock && effectiveQuantity > 0) {
+                val isDark = MaterialTheme.colorScheme.background.red < 0.3f
+                val (warnBg, warnText) = getStatusColors(OrderStatus.CANCELLED, isDark)
                 Card(
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = StatusCancelledBg),
-                    border = BorderStroke(1.dp, StatusCancelled)
+                    colors = CardDefaults.cardColors(containerColor = warnBg),
+                    border = BorderStroke(1.dp, warnText)
                 ) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.Warning, null, tint = StatusCancelled, modifier = Modifier.size(20.dp))
-                        Text("Only $availableStock water jars available today.", style = MaterialTheme.typography.bodyMedium, color = StatusCancelled)
+                        Icon(Icons.Default.Warning, null, tint = warnText, modifier = Modifier.size(20.dp))
+                        Text("Only $availableStock water jars available today.", style = MaterialTheme.typography.bodyMedium, color = warnText)
                     }
                 }
             }
@@ -284,8 +288,9 @@ fun ReturnJarBottomSheet(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             ) {
                 Column(Modifier.padding(12.dp)) {
+                    val isDark = MaterialTheme.colorScheme.background.red < 0.3f
                     Text("Customer: ${customer.name}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Pending Return: $totalPendingJars jars", style = MaterialTheme.typography.bodyMedium, color = StatusPending, fontWeight = FontWeight.SemiBold)
+                    Text("Pending Return: $totalPendingJars jars", style = MaterialTheme.typography.bodyMedium, color = getStatusColors(OrderStatus.PENDING, isDark).second, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -357,14 +362,16 @@ fun ReturnJarBottomSheet(
 
             // Validation warning
             if (totalProcessing > totalPendingJars) {
+                val isDark = MaterialTheme.colorScheme.background.red < 0.3f
+                val (warnBg, warnText) = getStatusColors(OrderStatus.CANCELLED, isDark)
                 Card(
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = StatusCancelledBg),
-                    border = BorderStroke(1.dp, StatusCancelled)
+                    colors = CardDefaults.cardColors(containerColor = warnBg),
+                    border = BorderStroke(1.dp, warnText)
                 ) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.Warning, null, tint = StatusCancelled, modifier = Modifier.size(20.dp))
-                        Text("Total (returned + damaged) cannot exceed $totalPendingJars pending jars.", style = MaterialTheme.typography.bodyMedium, color = StatusCancelled)
+                        Icon(Icons.Default.Warning, null, tint = warnText, modifier = Modifier.size(20.dp))
+                        Text("Total (returned + damaged) cannot exceed $totalPendingJars pending jars.", style = MaterialTheme.typography.bodyMedium, color = warnText)
                     }
                 }
             }
@@ -428,8 +435,9 @@ fun RecordPaymentBottomSheet(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             ) {
                 Column(Modifier.padding(12.dp)) {
+                    val isDark = MaterialTheme.colorScheme.background.red < 0.3f
                     Text("Customer: ${customer.name}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Pending: ${pendingAmount.toRupee()}", style = MaterialTheme.typography.bodyMedium, color = PaymentUnpaid, fontWeight = FontWeight.SemiBold)
+                    Text("Pending: ${pendingAmount.toRupee()}", style = MaterialTheme.typography.bodyMedium, color = getStatusColors(PaymentStatusType.UNPAID, isDark).second, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -532,7 +540,7 @@ fun SaveConfirmationDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.WaterDrop, null, tint = Teal40) },
+        icon = { Icon(Icons.Default.WaterDrop, null, tint = MaterialTheme.colorScheme.primary) },
         title = { Text("Confirm Jar Entry", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -541,7 +549,7 @@ fun SaveConfirmationDialog(
                 Text("Amount: ${totalAmount.toRupee()}", fontWeight = FontWeight.SemiBold)
                 Text("Paid Now: ${paidAmount.toRupee()}")
                 if (balance > 0) {
-                    Text("Balance: ${balance.toRupee()}", color = PaymentUnpaid, fontWeight = FontWeight.SemiBold)
+                    Text("Balance: ${balance.toRupee()}", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                 }
             }
         },

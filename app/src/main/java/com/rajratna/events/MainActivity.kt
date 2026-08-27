@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -24,15 +26,27 @@ import androidx.navigation.compose.rememberNavController
 import com.rajratna.events.ui.navigation.AppNavGraph
 import com.rajratna.events.ui.navigation.Screen
 import com.rajratna.events.ui.theme.RajratnaEventsTheme
+import com.rajratna.events.ui.theme.ThemeMode
+import com.rajratna.events.ui.theme.ThemeViewModel
 
 class MainActivity : ComponentActivity() {
+
+    /** Scoped to the Activity so it survives recomposition. */
+    private val themeViewModel: ThemeViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            RajratnaEventsTheme {
+            val themeMode by themeViewModel.themeMode.collectAsStateWithLifecycle()
+
+            RajratnaEventsTheme(themeMode = themeMode) {
                 val navController = rememberNavController()
-                MainAppScaffold(navController = navController)
+                MainAppScaffold(
+                    navController  = navController,
+                    currentTheme   = themeMode,
+                    onCycleTheme   = { themeViewModel.cycleTheme() }
+                )
             }
         }
     }
@@ -60,15 +74,19 @@ val topLevelRoutes = listOf(
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem("Home", Screen.Dashboard.route, Icons.Filled.Home, Icons.Outlined.Home),
-    BottomNavItem("Orders", Screen.OrdersList.route, Icons.Filled.Receipt, Icons.Outlined.Receipt),
-    BottomNavItem("Returns", Screen.Returns.route, Icons.Filled.AssignmentReturn, Icons.Outlined.AssignmentReturn),
-    BottomNavItem("Inventory", Screen.ItemsRates.route, Icons.Filled.Inventory2, Icons.Outlined.Inventory2),
-    BottomNavItem("More", Screen.More.route, Icons.Filled.MoreHoriz, Icons.Outlined.MoreHoriz)
+    BottomNavItem("Home",      Screen.Dashboard.route,  Icons.Filled.Home,             Icons.Outlined.Home),
+    BottomNavItem("Orders",    Screen.OrdersList.route, Icons.Filled.Receipt,           Icons.Outlined.Receipt),
+    BottomNavItem("Returns",   Screen.Returns.route,    Icons.Filled.AssignmentReturn,  Icons.Outlined.AssignmentReturn),
+    BottomNavItem("Inventory", Screen.ItemsRates.route, Icons.Filled.Inventory2,        Icons.Outlined.Inventory2),
+    BottomNavItem("More",      Screen.More.route,       Icons.Filled.MoreHoriz,         Icons.Outlined.MoreHoriz)
 )
 
 @Composable
-fun MainAppScaffold(navController: NavHostController) {
+fun MainAppScaffold(
+    navController: NavHostController,
+    currentTheme: ThemeMode,
+    onCycleTheme: () -> Unit
+) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
@@ -76,7 +94,7 @@ fun MainAppScaffold(navController: NavHostController) {
     val showBottomBar = currentRoute in topLevelRoutes
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier       = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (showBottomBar) {
@@ -96,7 +114,7 @@ fun MainAppScaffold(navController: NavHostController) {
                                             saveState = true
                                         }
                                         launchSingleTop = true
-                                        restoreState = true
+                                        restoreState    = true
                                     }
                                 }
                             },
@@ -108,8 +126,8 @@ fun MainAppScaffold(navController: NavHostController) {
                             },
                             label = {
                                 Text(
-                                    text = item.label,
-                                    fontSize = 11.sp,
+                                    text       = item.label,
+                                    fontSize   = 11.sp,
                                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             },
@@ -124,7 +142,9 @@ fun MainAppScaffold(navController: NavHostController) {
     ) { innerPadding ->
         AppNavGraph(
             navController = navController,
-            modifier = Modifier.padding(innerPadding)
+            currentTheme  = currentTheme,
+            onCycleTheme  = onCycleTheme,
+            modifier      = Modifier.padding(innerPadding)
         )
     }
 }

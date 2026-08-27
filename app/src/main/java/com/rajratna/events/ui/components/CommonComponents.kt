@@ -30,7 +30,9 @@ fun StatusChip(
     status: String,
     modifier: Modifier = Modifier
 ) {
-    val (bgColor, textColor) = getStatusColors(status)
+    // Use background luminance to detect dark mode — respects ThemeMode override
+    val isDark = MaterialTheme.colorScheme.background.red < 0.3f
+    val (bgColor, textColor) = getStatusColors(status, isDark)
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
@@ -46,16 +48,24 @@ fun StatusChip(
     }
 }
 
-fun getStatusColors(status: String): Pair<Color, Color> {
+fun getStatusColors(status: String, isDark: Boolean = false): Pair<Color, Color> {
     return when (status) {
-        OrderStatus.PENDING -> StatusPendingBg to StatusPending
-        OrderStatus.CONFIRMED -> StatusConfirmedBg to StatusConfirmed
-        OrderStatus.DELIVERED -> StatusDeliveredBg to StatusDelivered
-        OrderStatus.COMPLETED -> StatusCompletedBg to StatusCompleted
-        OrderStatus.CANCELLED -> StatusCancelledBg to StatusCancelled
-        PaymentStatusType.UNPAID -> PaymentUnpaidBg to PaymentUnpaid
-        PaymentStatusType.PARTIALLY_PAID -> PaymentPartialBg to PaymentPartial
-        PaymentStatusType.PAID -> PaymentPaidBg to PaymentPaid
+        OrderStatus.PENDING       -> if (isDark) StatusPendingBgDark   to StatusPendingDark
+                                     else         StatusPendingBg        to StatusPending
+        OrderStatus.CONFIRMED     -> if (isDark) StatusConfirmedBgDark  to StatusConfirmedDark
+                                     else         StatusConfirmedBg      to StatusConfirmed
+        OrderStatus.DELIVERED     -> if (isDark) StatusDeliveredBgDark  to StatusDeliveredDark
+                                     else         StatusDeliveredBg      to StatusDelivered
+        OrderStatus.COMPLETED     -> if (isDark) StatusCompletedBgDark  to StatusCompletedDark
+                                     else         StatusCompletedBg      to StatusCompleted
+        OrderStatus.CANCELLED     -> if (isDark) StatusCancelledBgDark  to StatusCancelledDark
+                                     else         StatusCancelledBg      to StatusCancelled
+        PaymentStatusType.UNPAID          -> if (isDark) PaymentUnpaidBgDark    to PaymentUnpaidDark
+                                             else         PaymentUnpaidBg        to PaymentUnpaid
+        PaymentStatusType.PARTIALLY_PAID  -> if (isDark) PaymentPartialBgDark   to PaymentPartialDark
+                                             else         PaymentPartialBg       to PaymentPartial
+        PaymentStatusType.PAID            -> if (isDark) PaymentPaidBgDark      to PaymentPaidDark
+                                             else         PaymentPaidBg          to PaymentPaid
         else -> Color.LightGray to Color.DarkGray
     }
 }
