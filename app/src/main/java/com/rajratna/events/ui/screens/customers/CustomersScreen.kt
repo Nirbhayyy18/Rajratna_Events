@@ -1,12 +1,15 @@
 package com.rajratna.events.ui.screens.customers
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,11 +26,11 @@ import com.rajratna.events.util.DateUtils
 import com.rajratna.events.util.WhatsAppUtils
 import com.rajratna.events.util.toRupee
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CustomersScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToCustomer: (Long) -> Unit,
+    onNavigateToCustomer: (String) -> Unit,
     viewModel: CustomersViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -72,7 +75,8 @@ fun CustomersScreen(
                             onCall = { WhatsAppUtils.callCustomer(context, cs.customer.mobileNumber) },
                             onAddJar = { viewModel.openQuickJar(cs.customer) },
                             onReturnJar = { viewModel.openReturnJar(cs.customer) },
-                            onRecordPayment = { viewModel.openRecordPayment(cs.customer) }
+                            onRecordPayment = { viewModel.openRecordPayment(cs.customer) },
+                            modifier = Modifier.animateItemPlacement()
                         )
                     }
                 }
@@ -129,38 +133,55 @@ private fun CustomerJarCard(
     onCall: () -> Unit,
     onAddJar: () -> Unit,
     onReturnJar: () -> Unit,
-    onRecordPayment: () -> Unit
+    onRecordPayment: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val jarStats = cs.jarStats
+    val hasPendingBalance = jarStats.pendingBalance > 0
 
     Card(
         onClick = onCardClick,
+        modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp),
+        border = BorderStroke(
+            1.dp,
+            if (hasPendingBalance)
+                PaymentUnpaid.copy(alpha = 0.25f)
+            else
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(Modifier.padding(16.dp)) {
-            // Header: Name + Call button
+            // Header: Avatar + Name + Call button
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        cs.customer.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        cs.customer.mobileNumber,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+                    // Circular initials avatar
+                    InitialsAvatar(name = cs.customer.name, size = 46.dp)
+                    Column {
+                        Text(
+                            cs.customer.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            cs.customer.mobileNumber,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-                IconButton(onClick = onCall) {
-                    Icon(Icons.Default.Call, "Call", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                FilledTonalIconButton(
+                    onClick = onCall,
+                    modifier = Modifier.size(38.dp),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = StatusConfirmedBg)
+                ) {
+                    Icon(Icons.Default.Call, "Call", tint = StatusConfirmed, modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -243,7 +264,7 @@ private fun CustomerJarCard(
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp)
                     ) {
-                        Icon(Icons.Default.AssignmentReturn, null, Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.AssignmentReturn, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("Return", style = MaterialTheme.typography.labelMedium)
                     }

@@ -25,7 +25,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.Gson
 import com.rajratna.events.RajratnaApp
-import com.rajratna.events.data.database.AppDatabase
+
 import com.rajratna.events.data.repository.AppRepository
 import com.rajratna.events.data.repository.BackupData
 import com.rajratna.events.ui.components.SectionHeader
@@ -112,20 +112,6 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
 
                 // EVERYTHING database-related goes on IO
                 withContext(Dispatchers.IO) {
-
-                    AppDatabase.resetInstance()
-
-                    val db = AppDatabase.getDatabase(context)
-
-                    db.clearAllTables()
-
-                    val repository = AppRepository(
-                        db.itemDao(),
-                        db.customerDao(),
-                        db.orderDao(),
-                        db.paymentDao()
-                    )
-
                     repository.restoreFromBackup(data)
                 }
 

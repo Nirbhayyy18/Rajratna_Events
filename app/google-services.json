@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "192785621531",
+    "project_id": "rajratna-events",
+    "storage_bucket": "rajratna-events.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:192785621531:android:a0ca3fb21694494ee38ebe",
+        "android_client_info": {
+          "package_name": "com.rajratna.events"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWPBnOj3B5wEP2wS-HdvxWvXOA-5e6AfI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

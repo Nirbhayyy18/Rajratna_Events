@@ -32,7 +32,7 @@ class CustomerDetailsViewModel(application: Application) : AndroidViewModel(appl
     private val _state = MutableStateFlow(CustomerDetailsState())
     val state: StateFlow<CustomerDetailsState> = _state.asStateFlow()
 
-    fun loadCustomer(customerId: Long) {
+    fun loadCustomer(customerId: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true)
             val customer = repository.getCustomerById(customerId)

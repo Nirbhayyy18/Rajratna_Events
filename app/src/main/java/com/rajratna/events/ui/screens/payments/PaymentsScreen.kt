@@ -24,7 +24,7 @@ import com.rajratna.events.util.*
 @Composable
 fun PaymentsScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToOrder: (Long) -> Unit,
+    onNavigateToOrder: (String) -> Unit,
     viewModel: PaymentsViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()

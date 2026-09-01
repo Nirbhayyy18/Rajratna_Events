@@ -12,56 +12,68 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 // ═══════════════════════════════════════════════════════════
-// Light Color Scheme — Intentionally Designed
+// Light Color Scheme — Jewel Emerald + Champagne Gold
 // ═══════════════════════════════════════════════════════════
 
 private val LightColorScheme = lightColorScheme(
-    primary             = Teal40,
+    primary             = Emerald40,
     onPrimary           = Color.White,
-    primaryContainer    = TealContainer,
-    onPrimaryContainer  = OnTealContainer,
-    secondary           = Orange40,
+    primaryContainer    = EmeraldContainer,
+    onPrimaryContainer  = OnEmeraldContainer,
+    secondary           = SlateIndigo40,
     onSecondary         = Color.White,
-    secondaryContainer  = OrangeContainer,
-    onSecondaryContainer = Color(0xFF3E2723),
-    tertiary            = Slate40,
+    secondaryContainer  = SlateIndigoContainer,
+    onSecondaryContainer = Color(0xFF1A2530),
+    tertiary            = Gold40,
     onTertiary          = Color.White,
+    tertiaryContainer   = GoldContainer,
+    onTertiaryContainer = OnGoldContainer,
     background          = LightBackground,
     onBackground        = LightOnBackground,
     surface             = LightSurface,
     onSurface           = LightOnSurface,
     surfaceVariant      = LightSurfaceVariant,
     onSurfaceVariant    = LightOnSurfaceVar,
-    surfaceContainerHighest = LightSurfaceVariant,
+    surfaceContainerLow      = Color(0xFFF3F6F5),
+    surfaceContainer         = Color(0xFFEDF2F0),
+    surfaceContainerHigh     = Color(0xFFE7ECE9),
+    surfaceContainerHighest  = Color(0xFFE0E6E3),
+    surfaceContainerLowest   = LightSurface,
     outline             = LightOutline,
     outlineVariant      = LightOutlineVariant,
-    error               = Color(0xFFB3261E),
+    error               = Color(0xFF991B1B),
     onError             = Color.White,
     scrim               = Color(0xFF000000)
 )
 
 // ═══════════════════════════════════════════════════════════
-// Dark Color Scheme — Intentionally Designed (NOT inverted)
+// Dark Color Scheme — OLED-friendly Deep Emerald
 // ═══════════════════════════════════════════════════════════
 
 private val DarkColorScheme = darkColorScheme(
-    primary             = Teal80,
+    primary             = Emerald80,
     onPrimary           = Color(0xFF003731),
-    primaryContainer    = TealContainerDark,
-    onPrimaryContainer  = OnTealContainerDark,
-    secondary           = Orange80,
-    onSecondary         = Color(0xFF3E1500),
-    secondaryContainer  = OrangeContainerDark,
-    onSecondaryContainer = Orange80,
-    tertiary            = Slate80,
-    onTertiary          = Color(0xFF192228),
+    primaryContainer    = EmeraldContainerDark,
+    onPrimaryContainer  = OnEmeraldContainerDark,
+    secondary           = SlateIndigo80,
+    onSecondary         = Color(0xFF1A2530),
+    secondaryContainer  = Color(0xFF1E2D3D),
+    onSecondaryContainer = SlateIndigo80,
+    tertiary            = Gold80,
+    onTertiary          = Color(0xFF3D2C00),
+    tertiaryContainer   = GoldContainerDark,
+    onTertiaryContainer = Gold80,
     background          = DarkBackground,
     onBackground        = DarkOnBackground,
     surface             = DarkSurface,
     onSurface           = DarkOnSurface,
     surfaceVariant      = DarkSurfaceVariant,
     onSurfaceVariant    = DarkOnSurfaceVar,
-    surfaceContainerHighest = DarkSurfaceElev,
+    surfaceContainerLow      = Color(0xFF17201E),
+    surfaceContainer         = DarkSurfaceVariant,
+    surfaceContainerHigh     = DarkSurfaceElev,
+    surfaceContainerHighest  = Color(0xFF2A3A36),
+    surfaceContainerLowest   = DarkBackground,
     outline             = DarkOutline,
     outlineVariant      = DarkOutlineVariant,
     error               = Color(0xFFEF9A9A),

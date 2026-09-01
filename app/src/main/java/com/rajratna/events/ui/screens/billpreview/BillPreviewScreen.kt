@@ -29,7 +29,7 @@ import com.rajratna.events.util.WhatsAppUtils
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BillPreviewScreen(
-    orderId: Long,
+    orderId: String,
     onNavigateBack: () -> Unit,
     viewModel: BillPreviewViewModel = viewModel()
 ) {

@@ -1,28 +1,95 @@
 package com.rajratna.events.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.rajratna.events.data.entity.OrderStatus
 import com.rajratna.events.data.entity.PaymentStatusType
 import com.rajratna.events.ui.theme.*
 import com.rajratna.events.util.toRupee
 
 // ═══════════════════════════════════════════════════════════
-// STATUS CHIP
+// ICON POD — Tinted icon container
+// ═══════════════════════════════════════════════════════════
+
+@Composable
+fun IconPod(
+    icon: ImageVector,
+    contentDescription: String? = null,
+    containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    iconColor: Color = MaterialTheme.colorScheme.primary,
+    size: Dp = 44.dp,
+    iconSize: Dp = 22.dp,
+    shape: Shape = RoundedCornerShape(12.dp)
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .background(containerColor, shape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = iconColor,
+            modifier = Modifier.size(iconSize)
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATUS BADGE — Pill-shaped status indicator
+// ═══════════════════════════════════════════════════════════
+
+@Composable
+fun StatusBadge(
+    text: String,
+    containerColor: Color,
+    contentColor: Color,
+    borderColor: Color? = null,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(50),
+        color = containerColor,
+        border = borderColor?.let { BorderStroke(1.dp, it) }
+    ) {
+        Text(
+            text = text,
+            color = contentColor,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATUS CHIP — Backward-compatible wrapper using StatusBadge
 // ═══════════════════════════════════════════════════════════
 
 @Composable
@@ -30,22 +97,16 @@ fun StatusChip(
     status: String,
     modifier: Modifier = Modifier
 ) {
-    // Use background luminance to detect dark mode — respects ThemeMode override
     val isDark = MaterialTheme.colorScheme.background.red < 0.3f
     val (bgColor, textColor) = getStatusColors(status, isDark)
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = bgColor
-    ) {
-        Text(
-            text = status,
-            style = MaterialTheme.typography.labelSmall,
-            color = textColor,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-        )
-    }
+    val borderColor = getStatusBorderColor(status)
+    StatusBadge(
+        text = status,
+        containerColor = bgColor,
+        contentColor = textColor,
+        borderColor = borderColor,
+        modifier = modifier
+    )
 }
 
 fun getStatusColors(status: String, isDark: Boolean = false): Pair<Color, Color> {
@@ -60,18 +121,96 @@ fun getStatusColors(status: String, isDark: Boolean = false): Pair<Color, Color>
                                      else         StatusCompletedBg      to StatusCompleted
         OrderStatus.CANCELLED     -> if (isDark) StatusCancelledBgDark  to StatusCancelledDark
                                      else         StatusCancelledBg      to StatusCancelled
-        PaymentStatusType.UNPAID          -> if (isDark) PaymentUnpaidBgDark    to PaymentUnpaidDark
+        PaymentStatusType.UNPAID         -> if (isDark) PaymentUnpaidBgDark    to PaymentUnpaidDark
                                              else         PaymentUnpaidBg        to PaymentUnpaid
-        PaymentStatusType.PARTIALLY_PAID  -> if (isDark) PaymentPartialBgDark   to PaymentPartialDark
+        PaymentStatusType.PARTIALLY_PAID -> if (isDark) PaymentPartialBgDark   to PaymentPartialDark
                                              else         PaymentPartialBg       to PaymentPartial
-        PaymentStatusType.PAID            -> if (isDark) PaymentPaidBgDark      to PaymentPaidDark
+        PaymentStatusType.PAID           -> if (isDark) PaymentPaidBgDark      to PaymentPaidDark
                                              else         PaymentPaidBg          to PaymentPaid
         else -> Color.LightGray to Color.DarkGray
     }
 }
 
+fun getStatusBorderColor(status: String): Color? {
+    return when (status) {
+        OrderStatus.PENDING, PaymentStatusType.PARTIALLY_PAID  -> StatusPendingBorder
+        OrderStatus.CONFIRMED                                   -> StatusConfirmedBorder
+        OrderStatus.COMPLETED, PaymentStatusType.PAID          -> StatusCompletedBorder
+        OrderStatus.CANCELLED, PaymentStatusType.UNPAID        -> StatusCancelledBorder
+        else -> null
+    }
+}
+
 // ═══════════════════════════════════════════════════════════
-// STAT CARD (Dashboard)
+// CUSTOMER INITIALS AVATAR
+// ═══════════════════════════════════════════════════════════
+
+@Composable
+fun InitialsAvatar(
+    name: String,
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp
+) {
+    val initials = name.trim().split(" ")
+        .filter { it.isNotEmpty() }
+        .take(2)
+        .joinToString("") { it.first().uppercaseChar().toString() }
+        .ifEmpty { "?" }
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = initials,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            fontSize = (size.value * 0.36f).sp,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// PREMIUM CARD CONTAINER
+// ═══════════════════════════════════════════════════════════
+
+@Composable
+fun PremiumCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val shape = RoundedCornerShape(16.dp)
+    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+
+    if (onClick != null) {
+        Card(
+            onClick = onClick,
+            modifier = modifier,
+            shape = shape,
+            colors = CardDefaults.cardColors(containerColor = containerColor),
+            border = border,
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 2.dp),
+            content = { Column(Modifier.padding(16.dp), content = content) }
+        )
+    } else {
+        Card(
+            modifier = modifier,
+            shape = shape,
+            colors = CardDefaults.cardColors(containerColor = containerColor),
+            border = border,
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            content = { Column(Modifier.padding(16.dp), content = content) }
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// STAT CARD (Dashboard) — upgraded with IconPod
 // ═══════════════════════════════════════════════════════════
 
 @Composable
@@ -82,37 +221,27 @@ fun StatCard(
     iconTint: Color = MaterialTheme.colorScheme.primary,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(24.dp)
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+    PremiumCard(modifier = modifier) {
+        IconPod(
+            icon = icon,
+            iconColor = iconTint,
+            containerColor = iconTint.copy(alpha = 0.12f),
+            size = 40.dp,
+            iconSize = 20.dp
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -169,7 +298,7 @@ fun QuickActionButton(
             containerColor = containerColor,
             contentColor = contentColor
         ),
-        elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 2.dp)
+        elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 0.dp)
     ) {
         Icon(
             imageVector = icon,
@@ -177,7 +306,7 @@ fun QuickActionButton(
             modifier = Modifier.size(18.dp)
         )
         Spacer(Modifier.width(8.dp))
-        Text(text = text, style = MaterialTheme.typography.labelLarge)
+        Text(text = text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -209,7 +338,7 @@ fun SectionHeader(
 }
 
 // ═══════════════════════════════════════════════════════════
-// EMPTY STATE
+// EMPTY STATE — improved with icon pod
 // ═══════════════════════════════════════════════════════════
 
 @Composable
@@ -226,21 +355,25 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.outline
+        IconPod(
+            icon = icon,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            iconColor = MaterialTheme.colorScheme.outline,
+            size = 72.dp,
+            iconSize = 36.dp,
+            shape = RoundedCornerShape(20.dp)
         )
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
     }
 }

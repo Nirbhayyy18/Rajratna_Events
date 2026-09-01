@@ -16,7 +16,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.rajratna.events.data.entity.Customer
+import com.rajratna.events.data.entity.OrderStatus
 import com.rajratna.events.data.entity.PaymentMethod
+import com.rajratna.events.data.entity.PaymentStatusType
 import com.rajratna.events.data.repository.CustomerJarStats
 import com.rajratna.events.ui.theme.*
 import com.rajratna.events.util.DateUtils
@@ -84,11 +86,13 @@ fun QuickJarBottomSheet(
                     Text("Mobile: ${customer.mobileNumber}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (jarStats.pendingBalance > 0) {
                         val isDark = MaterialTheme.colorScheme.background.red < 0.3f
-                        Text("Balance: ${jarStats.pendingBalance.toRupee()}", style = MaterialTheme.typography.bodyMedium, color = getStatusColors(PaymentStatusType.UNPAID, isDark).second, fontWeight = FontWeight.SemiBold)
+                        Text("Balance: ${jarStats.pendingBalance.toRupee()}", style = MaterialTheme.typography.bodyMedium, color = getStatusColors(
+                            PaymentStatusType.UNPAID, isDark).second, fontWeight = FontWeight.SemiBold)
                     }
                     if (jarStats.pendingReturnJars > 0) {
                         val isDark = MaterialTheme.colorScheme.background.red < 0.3f
-                        Text("Pending Return: ${jarStats.pendingReturnJars} jars", style = MaterialTheme.typography.bodyMedium, color = getStatusColors(OrderStatus.PENDING, isDark).second)
+                        Text("Pending Return: ${jarStats.pendingReturnJars} jars", style = MaterialTheme.typography.bodyMedium, color = getStatusColors(
+                            OrderStatus.PENDING, isDark).second)
                     }
                     if (jarStats.lastJarQuantity > 0) {
                         Text("Last: ${jarStats.lastJarQuantity} jars on ${DateUtils.formatShortDate(jarStats.lastJarDate)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

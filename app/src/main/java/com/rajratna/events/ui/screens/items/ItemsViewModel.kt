@@ -10,7 +10,7 @@ import kotlinx.coroutines.launch
 
 data class ItemsState(
     val items: List<Item> = emptyList(),
-    val rentedMap: Map<Long, Int> = emptyMap(),
+    val rentedMap: Map<String, Int> = emptyMap(),
     val isLoading: Boolean = true
 )
 
@@ -48,14 +48,19 @@ class ItemsViewModel(application: Application) : AndroidViewModel(application) {
 
     fun addItem(name: String, rate: Double, totalStock: Int, lowStockAlert: Int) {
         viewModelScope.launch {
-            repository.insertItem(
-                Item(
-                    name = name,
-                    ratePerDay = rate,
-                    totalStock = maxOf(0, totalStock),
-                    lowStockAlert = maxOf(0, lowStockAlert)
+            try {
+                repository.insertItem(
+                    Item(
+                        name = name,
+                        ratePerDay = rate,
+                        totalStock = maxOf(0, totalStock),
+                        lowStockAlert = maxOf(0, lowStockAlert)
+                    )
                 )
-            )
+                android.util.Log.d("ItemsViewModel", "Item '$name' saved successfully")
+            } catch (e: Exception) {
+                android.util.Log.e("ItemsViewModel", "Failed to save item '$name': ${e.message}", e)
+            }
         }
     }
 
@@ -70,7 +75,7 @@ class ItemsViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun toggleActive(id: Long, isActive: Boolean) {
+    fun toggleActive(id: String, isActive: Boolean) {
         viewModelScope.launch { repository.setItemActive(id, isActive) }
     }
 
@@ -94,13 +99,13 @@ class ItemsViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Compute available stock for a given item */
-    fun getAvailable(item: Item, rentedMap: Map<Long, Int>): Int {
+    fun getAvailable(item: Item, rentedMap: Map<String, Int>): Int {
         val rented = rentedMap[item.id] ?: 0
         return maxOf(0, item.totalStock - rented)
     }
 
     /** Get rented count for a given item */
-    fun getRented(item: Item, rentedMap: Map<Long, Int>): Int {
+    fun getRented(item: Item, rentedMap: Map<String, Int>): Int {
         return rentedMap[item.id] ?: 0
     }
 }

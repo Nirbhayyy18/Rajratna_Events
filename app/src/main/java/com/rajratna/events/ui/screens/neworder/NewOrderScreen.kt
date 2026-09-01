@@ -30,8 +30,8 @@ import java.util.*
 @Composable
 fun NewOrderScreen(
     onNavigateBack: () -> Unit,
-    onOrderSaved: (Long) -> Unit,
-    editOrderId: Long? = null,
+    onOrderSaved: (String) -> Unit,
+    editOrderId: String? = null,
     viewModel: NewOrderViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -40,7 +40,7 @@ fun NewOrderScreen(
 
     // Load order for editing
     LaunchedEffect(editOrderId) {
-        if (editOrderId != null && editOrderId > 0) {
+        if (editOrderId != null && editOrderId.isNotEmpty()) {
             viewModel.loadOrder(editOrderId)
         }
     }

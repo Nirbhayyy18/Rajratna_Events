@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
  * Per-item stock info for the dashboard.
  */
 data class ItemStockInfo(
-    val itemId: Long,
+    val itemId: String,
     val name: String,
     val totalStock: Int,
     val availableStock: Int,
@@ -30,7 +30,7 @@ data class ItemStockInfo(
  * Pending return preview for dashboard cards.
  */
 data class PendingReturnPreview(
-    val orderId: Long,
+    val orderId: String,
     val billNumber: Int,
     val customerName: String,
     val customerMobile: String,
@@ -59,7 +59,7 @@ enum class DashboardAlertType {
 }
 
 data class UpcomingDeliveryInfo(
-    val orderId: Long,
+    val orderId: String,
     val deliveryDate: Long,
     val customerName: String,
     val itemSummary: String

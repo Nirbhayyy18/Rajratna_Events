@@ -28,9 +28,9 @@ import com.rajratna.events.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomerDetailsScreen(
-    customerId: Long,
+    customerId: String,
     onNavigateBack: () -> Unit,
-    onNavigateToOrder: (Long) -> Unit,
+    onNavigateToOrder: (String) -> Unit,
     onNavigateToNewOrder: () -> Unit,
     viewModel: CustomerDetailsViewModel = viewModel()
 ) {

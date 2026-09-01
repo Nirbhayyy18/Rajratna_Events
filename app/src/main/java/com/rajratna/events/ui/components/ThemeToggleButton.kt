@@ -33,7 +33,7 @@ fun ThemeToggleButton(
     onCycleTheme: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val (icon, description) = when (currentMode) {
+    val (icon, description, label) = when (currentMode) {
         ThemeMode.SYSTEM -> Triple(
             Icons.Outlined.BrightnessAuto,
             "Theme: Auto (system). Tap to switch to Light mode.",
@@ -54,7 +54,7 @@ fun ThemeToggleButton(
     IconButton(
         onClick = onCycleTheme,
         modifier = modifier.semantics {
-            contentDescription = description.second
+            contentDescription = description
         }
     ) {
         Crossfade(

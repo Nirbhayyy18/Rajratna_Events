@@ -20,20 +20,33 @@ import com.rajratna.events.ui.screens.orders.OrdersListScreen
 import com.rajratna.events.ui.screens.payments.PaymentsScreen
 import com.rajratna.events.ui.screens.reports.ReportsScreen
 import com.rajratna.events.ui.screens.returns.ReturnsScreen
+import com.rajratna.events.ui.screens.login.LoginScreen
 import com.rajratna.events.ui.theme.ThemeMode
 
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
+    startDestination: String = Screen.Dashboard.route,
     currentTheme: ThemeMode,
     onCycleTheme: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     NavHost(
         navController    = navController,
-        startDestination = Screen.Dashboard.route,
+        startDestination = startDestination,
         modifier         = modifier
     ) {
+        // Login
+        composable(Screen.Login.route) {
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         // Dashboard
         composable(Screen.Dashboard.route) {
             DashboardScreen(
@@ -72,9 +85,9 @@ fun AppNavGraph(
         // Edit Order
         composable(
             route     = Screen.EditOrder.route,
-            arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+            arguments = listOf(navArgument("orderId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
+            val orderId = backStackEntry.arguments?.getString("orderId") ?: ""
             NewOrderScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onOrderSaved   = { navController.popBackStack() },
@@ -94,9 +107,9 @@ fun AppNavGraph(
         // Order Details
         composable(
             route     = Screen.OrderDetails.route,
-            arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+            arguments = listOf(navArgument("orderId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
+            val orderId = backStackEntry.arguments?.getString("orderId") ?: ""
             OrderDetailsScreen(
                 orderId             = orderId,
                 onNavigateBack      = { navController.popBackStack() },
@@ -108,9 +121,9 @@ fun AppNavGraph(
         // Bill Preview
         composable(
             route     = Screen.BillPreview.route,
-            arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+            arguments = listOf(navArgument("orderId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val orderId = backStackEntry.arguments?.getLong("orderId") ?: 0L
+            val orderId = backStackEntry.arguments?.getString("orderId") ?: ""
             BillPreviewScreen(
                 orderId        = orderId,
                 onNavigateBack = { navController.popBackStack() }
@@ -137,9 +150,9 @@ fun AppNavGraph(
         // Customer Details
         composable(
             route     = Screen.CustomerDetails.route,
-            arguments = listOf(navArgument("customerId") { type = NavType.LongType })
+            arguments = listOf(navArgument("customerId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val customerId = backStackEntry.arguments?.getLong("customerId") ?: 0L
+            val customerId = backStackEntry.arguments?.getString("customerId") ?: ""
             CustomerDetailsScreen(
                 customerId          = customerId,
                 onNavigateBack      = { navController.popBackStack() },

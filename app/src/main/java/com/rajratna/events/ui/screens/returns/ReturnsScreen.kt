@@ -30,7 +30,7 @@ import android.app.DatePickerDialog
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReturnsScreen(
-    onNavigateToOrderDetails: (Long) -> Unit,
+    onNavigateToOrderDetails: (String) -> Unit,
     viewModel: ReturnsViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -135,7 +135,7 @@ fun ReturnsScreen(
 private fun PendingReturnsTab(
     state: ReturnsState,
     viewModel: ReturnsViewModel,
-    onNavigateToOrderDetails: (Long) -> Unit
+    onNavigateToOrderDetails: (String) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -389,7 +389,7 @@ private fun PendingReturnCard(
 private fun ReturnedTab(
     state: ReturnsState,
     viewModel: ReturnsViewModel,
-    onNavigateToOrderDetails: (Long) -> Unit
+    onNavigateToOrderDetails: (String) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -588,7 +588,7 @@ private fun ReturnedCard(
 private fun RecordReturnSheet(
     entries: List<ReturnEntry>,
     isSaving: Boolean,
-    onUpdateReturnedNow: (Long, Int) -> Unit,
+    onUpdateReturnedNow: (String, Int) -> Unit,
     onMarkAllReturned: () -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit

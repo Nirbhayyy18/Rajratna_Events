@@ -1,9 +1,12 @@
 package com.rajratna.events.ui.screens.items
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -21,8 +24,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rajratna.events.data.entity.Item
+import com.rajratna.events.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ItemsScreen(onNavigateBack: () -> Unit, viewModel: ItemsViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -71,7 +75,8 @@ fun ItemsScreen(onNavigateBack: () -> Unit, viewModel: ItemsViewModel = viewMode
                     isLowStock = isLowStock,
                     isOutOfStock = isOutOfStock,
                     onEdit = { editItem = item },
-                    onToggleActive = { viewModel.toggleActive(item.id, it) }
+                    onToggleActive = { viewModel.toggleActive(item.id, it) },
+                    modifier = Modifier.animateItemPlacement()
                 )
             }
             item { Spacer(Modifier.height(80.dp)) }
@@ -163,20 +168,42 @@ private fun ItemStockCard(
     isLowStock: Boolean,
     isOutOfStock: Boolean,
     onEdit: () -> Unit,
-    onToggleActive: (Boolean) -> Unit
+    onToggleActive: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val warningColor = MaterialTheme.colorScheme.error
-    val lowStockColor = MaterialTheme.colorScheme.tertiary
+    // Determine stock status
+    val stockDotColor = when {
+        !item.isActive  -> MaterialTheme.colorScheme.outline
+        isOutOfStock    -> StatusCancelled
+        isLowStock      -> StatusPending
+        else            -> StatusCompleted
+    }
+    val stockLabel = when {
+        !item.isActive  -> "Inactive"
+        isOutOfStock    -> "All Booked"
+        isLowStock      -> "Low Stock ($available available)"
+        item.totalStock > 0 -> "In Stock ($available available)"
+        else            -> "No stock set"
+    }
 
     Card(
+        modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (!item.isActive)
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                MaterialTheme.colorScheme.surfaceContainerLow
             else
                 MaterialTheme.colorScheme.surface
-        )
+        ),
+        border = BorderStroke(
+            1.dp,
+            when {
+                isOutOfStock -> StatusCancelledBorder.copy(alpha = 0.6f)
+                isLowStock   -> StatusPendingBorder.copy(alpha = 0.6f)
+                else         -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            }
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
             // ── Top row: Name + Rate + Controls ──
@@ -185,24 +212,39 @@ private fun ItemStockCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                    // Stock status dot
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(stockDotColor, CircleShape)
                     )
-                    Text(
-                        "₹${item.ratePerDay.toInt()} / day",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Column {
+                        Text(
+                            item.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "₹${item.ratePerDay.toInt()} / day",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, "Edit", Modifier.size(20.dp))
+                    FilledTonalIconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(36.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Icon(Icons.Default.Edit, "Edit", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
                     }
                     Switch(
                         checked = item.isActive,
@@ -211,27 +253,24 @@ private fun ItemStockCard(
                 }
             }
 
-            // ── Stock badge (if applicable) ──
-            if (item.totalStock > 0 && (isOutOfStock || isLowStock)) {
-                Spacer(Modifier.height(8.dp))
-                val badgeColor = if (isOutOfStock) warningColor else lowStockColor
-                val badgeText = if (isOutOfStock) "⚠ Out of Stock" else "⚠ Low Stock"
+            // ── Stock status label ──
+            Spacer(Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Text(
-                    text = badgeText,
-                    color = MaterialTheme.colorScheme.onError,
+                    text = stockLabel,
                     style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(badgeColor.copy(alpha = 0.9f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                    color = stockDotColor,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
             // ── Stock info grid ──
             if (item.totalStock > 0) {
                 Spacer(Modifier.height(10.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 Spacer(Modifier.height(10.dp))
 
                 Row(
@@ -243,22 +282,14 @@ private fun ItemStockCard(
                         label = "Available",
                         value = available.toString(),
                         valueColor = when {
-                            isOutOfStock -> warningColor
-                            isLowStock -> lowStockColor
-                            else -> MaterialTheme.colorScheme.primary
+                            isOutOfStock -> StatusCancelled
+                            isLowStock   -> StatusPending
+                            else         -> StatusCompleted
                         }
                     )
-                    StockStat(label = "Rented", value = rented.toString())
+                    StockStat(label = "Rented", value = rented.toString(), valueColor = if (rented > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                     StockStat(label = "Alert at", value = "≤${item.lowStockAlert}")
                 }
-            } else {
-                // Stock not configured yet
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Stock not set — tap edit to configure",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
             }
         }
     }

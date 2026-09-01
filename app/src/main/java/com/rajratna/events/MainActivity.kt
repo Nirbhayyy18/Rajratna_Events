@@ -39,13 +39,16 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val themeMode by themeViewModel.themeMode.collectAsStateWithLifecycle()
+            val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+            val startDestination = if (auth.currentUser != null) Screen.Dashboard.route else Screen.Login.route
 
             RajratnaEventsTheme(themeMode = themeMode) {
                 val navController = rememberNavController()
                 MainAppScaffold(
-                    navController  = navController,
-                    currentTheme   = themeMode,
-                    onCycleTheme   = { themeViewModel.cycleTheme() }
+                    navController = navController,
+                    startDestination = startDestination,
+                    currentTheme = themeMode,
+                    onCycleTheme = { themeViewModel.cycleTheme() }
                 )
             }
         }
@@ -84,6 +87,7 @@ val bottomNavItems = listOf(
 @Composable
 fun MainAppScaffold(
     navController: NavHostController,
+    startDestination: String,
     currentTheme: ThemeMode,
     onCycleTheme: () -> Unit
 ) {
@@ -142,9 +146,10 @@ fun MainAppScaffold(
     ) { innerPadding ->
         AppNavGraph(
             navController = navController,
-            currentTheme  = currentTheme,
-            onCycleTheme  = onCycleTheme,
-            modifier      = Modifier.padding(innerPadding)
+            startDestination = startDestination,
+            currentTheme = currentTheme,
+            onCycleTheme = onCycleTheme,
+            modifier = Modifier.padding(innerPadding)
         )
     }
 }

@@ -1,34 +1,20 @@
 package com.rajratna.events.data.entity
 
-import androidx.room.Entity
-import androidx.room.ForeignKey
-import androidx.room.Index
-import androidx.room.PrimaryKey
+import com.google.firebase.firestore.DocumentId
 
 /**
  * Payment record for an order.
  * Multiple payments can be recorded against one order.
+ * Stored in Firestore as subcollection "payments" under each order document.
  */
-@Entity(
-    tableName = "payments",
-    foreignKeys = [
-        ForeignKey(
-            entity = Order::class,
-            parentColumns = ["id"],
-            childColumns = ["orderId"],
-            onDelete = ForeignKey.CASCADE
-        )
-    ],
-    indices = [Index("orderId")]
-)
 data class Payment(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    val orderId: Long,
-    val customerName: String,
-    val customerMobile: String,
-    val amount: Double,
-    val paymentDate: Long,
+    @DocumentId
+    val id: String = "",
+    val orderId: String = "",
+    val customerName: String = "",
+    val customerMobile: String = "",
+    val amount: Double = 0.0,
+    val paymentDate: Long = 0L,
     val paymentMethod: String = PaymentMethod.CASH,
     val notes: String = "",
     val createdAt: Long = System.currentTimeMillis()

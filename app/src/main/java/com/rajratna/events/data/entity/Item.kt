@@ -1,20 +1,20 @@
 package com.rajratna.events.data.entity
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+import com.google.firebase.firestore.DocumentId
 
 /**
  * Rental item (e.g. Table, Chair, Water Jar).
  * Owner can add/edit items and change rates.
+ * Stored in Firestore "items" collection.
  */
-@Entity(tableName = "items")
 data class Item(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    val name: String,
-    val ratePerDay: Double,
+    @DocumentId
+    val id: String = "",
+    val name: String = "",
+    val ratePerDay: Double = 0.0,
     val totalStock: Int = 0,
     val lowStockAlert: Int = 0,
     val isActive: Boolean = true,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false
 )

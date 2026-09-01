@@ -11,7 +11,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.rajratna.events.RajratnaApp
-import com.rajratna.events.data.dao.ItemIncome
+import com.rajratna.events.data.repository.ItemIncome
 import com.rajratna.events.util.DateUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch

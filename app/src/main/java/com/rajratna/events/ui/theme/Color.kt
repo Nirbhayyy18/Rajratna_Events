@@ -3,122 +3,148 @@ package com.rajratna.events.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ═══════════════════════════════════════════════════════════
-// Primary Brand Colors — Professional Teal
+// Primary Brand Colors — Jewel Emerald
 // ═══════════════════════════════════════════════════════════
 
-val Teal80  = Color(0xFF4DB6AC)   // Light (dark-mode primary)
-val Teal60  = Color(0xFF26A69A)   // Mid tone
-val Teal40  = Color(0xFF00695C)   // Dark (light-mode primary)
+val Emerald10  = Color(0xFF052B27)  // Deepest (on-primary-container)
+val Emerald20  = Color(0xFF0A3D37)
+val Emerald40  = Color(0xFF0E5247)  // Light-mode primary
+val Emerald60  = Color(0xFF1A7A6A)
+val Emerald80  = Color(0xFF5ABFAE)  // Dark-mode primary
+val Emerald90  = Color(0xFF8ED8CC)
 
-val TealContainer     = Color(0xFFE0F2F1)   // Light-mode primary container
-val OnTealContainer   = Color(0xFF003D33)   // On light-mode primary container
-val TealContainerDark = Color(0xFF00504A)   // Dark-mode primary container
-val OnTealContainerDark = Color(0xFFB2DFDB) // On dark-mode primary container
+val EmeraldContainer     = Color(0xFFE0F4F1)  // Light-mode primary container
+val OnEmeraldContainer   = Color(0xFF052B27)
+val EmeraldContainerDark = Color(0xFF004F47)  // Dark-mode primary container
+val OnEmeraldContainerDark = Color(0xFF8EF4E3)
+
+// Legacy aliases kept for backward compatibility
+val Teal80  = Emerald80
+val Teal60  = Emerald60
+val Teal40  = Emerald40
+
+val TealContainer       = EmeraldContainer
+val OnTealContainer     = OnEmeraldContainer
+val TealContainerDark   = EmeraldContainerDark
+val OnTealContainerDark = OnEmeraldContainerDark
 
 // ═══════════════════════════════════════════════════════════
-// Secondary Colors — Warm Amber/Orange
+// Secondary Colors — Slate Indigo
 // ═══════════════════════════════════════════════════════════
 
+val SlateIndigo80        = Color(0xFF8FA8C8)
+val SlateIndigo40        = Color(0xFF2C3E50)
+val SlateIndigoContainer = Color(0xFFE8ECF2)
+val SlateIndigoContainerDark = Color(0xFF1A2530)
+
+// Legacy orange aliases kept for backward compatibility
 val Orange80        = Color(0xFFFFB74D)
 val Orange40        = Color(0xFFE65100)
 val OrangeContainer = Color(0xFFFFF3E0)
 val OrangeContainerDark = Color(0xFF4A2200)
 
 // ═══════════════════════════════════════════════════════════
-// Tertiary Colors — Slate Gray
+// Tertiary Colors — Champagne Gold
 // ═══════════════════════════════════════════════════════════
 
+val Gold80 = Color(0xFFD4AF37)   // Light-mode tertiary (Champagne Gold)
+val Gold40 = Color(0xFFB8860B)   // Dark-mode tertiary
+val GoldContainer     = Color(0xFFFFF8E7)
+val OnGoldContainer   = Color(0xFF5A4200)
+val GoldContainerDark = Color(0xFF3D2C00)
+
+// Legacy slate aliases
 val Slate80 = Color(0xFFB0BEC5)
 val Slate40 = Color(0xFF455A64)
 
 // ═══════════════════════════════════════════════════════════
-// Intentionally Designed Surface Palette — Light
-// ═══════════════════════════════════════════════════════════
-// Not plain white/grey — uses a warm, off-white tinted base
-
-val LightBackground     = Color(0xFFF5F6FA)  // App background
-val LightSurface        = Color(0xFFFFFFFF)  // Cards, sheets, dialogs
-val LightSurfaceVariant = Color(0xFFEEF0F8)  // Subtle tinted container surface
-val LightSurfaceElev    = Color(0xFFFFFFFF)  // Elevated cards (same, elevated by shadow)
-val LightOutline        = Color(0xFF9196A5)
-val LightOutlineVariant = Color(0xFFE2E4EC)  // Dividers
-val LightOnBackground   = Color(0xFF111318)  // Primary text
-val LightOnSurface      = Color(0xFF111318)
-val LightOnSurfaceVar   = Color(0xFF5C6070)  // Secondary text
-
-// ═══════════════════════════════════════════════════════════
-// Intentionally Designed Surface Palette — Dark
-// ═══════════════════════════════════════════════════════════
-// OLED-friendly dark blue-grey — NOT pure black.
-// Uses layered surfaces to communicate elevation.
-
-val DarkBackground      = Color(0xFF111318)  // Base layer (OLED-friendly deep blue-grey)
-val DarkSurface         = Color(0xFF1C1F26)  // Cards, sheets — slightly lighter
-val DarkSurfaceVariant  = Color(0xFF252932)  // Elevated cards — clearly distinct
-val DarkSurfaceElev     = Color(0xFF2E3340)  // Modals, dialogs — most elevated
-val DarkOutline         = Color(0xFF484E62)  // Subtle borders
-val DarkOutlineVariant  = Color(0xFF2A2E38)  // Dividers — very subtle
-val DarkOnBackground    = Color(0xFFE8EAF0)  // Primary text (off-white, not harsh)
-val DarkOnSurface       = Color(0xFFE8EAF0)
-val DarkOnSurfaceVar    = Color(0xFF8E93A6)  // Secondary text (muted blue-grey)
-
-// ═══════════════════════════════════════════════════════════
-// Status Colors — Order Status Chips (Light)
+// Surface Palette — Light
 // ═══════════════════════════════════════════════════════════
 
-val StatusPending       = Color(0xFFFFA726)  // Amber
-val StatusPendingBg     = Color(0xFFFFF8E1)
-val StatusConfirmed     = Color(0xFF1E88E5)  // Blue
-val StatusConfirmedBg   = Color(0xFFE3F2FD)
-val StatusDelivered     = Color(0xFF26A69A)  // Teal
-val StatusDeliveredBg   = Color(0xFFE0F2F1)
-val StatusCompleted     = Color(0xFF43A047)  // Green
-val StatusCompletedBg   = Color(0xFFE8F5E9)
-val StatusCancelled     = Color(0xFFEF5350)  // Red
-val StatusCancelledBg   = Color(0xFFFFEBEE)
-
-// Alert icon backgrounds (Light) — used in Dashboard AlertRow
-val AlertOverdueIconBg    = Color(0xFFFFEFEF)
-val AlertOverdueIconColor = Color(0xFFD63939)
-val AlertPaymentIconBg    = Color(0xFFFFF6EA)
-val AlertPaymentIconColor = Color(0xFFDB7A00)
-val AlertStockIconBg      = Color(0xFFEFF4FF)
-val AlertStockIconColor   = Color(0xFF1E5CC8)
-val AlertBookingIconBg    = Color(0xFFEFFAF3)
-val AlertBookingIconColor = Color(0xFF2F9B50)
+val LightBackground     = Color(0xFFF8FAF9)  // Slightly green-tinted off-white
+val LightSurface        = Color(0xFFFFFFFF)
+val LightSurfaceVariant = Color(0xFFEDF2F0)
+val LightSurfaceElev    = Color(0xFFFFFFFF)
+val LightOutline        = Color(0xFF8FA09B)
+val LightOutlineVariant = Color(0xFFD0D9D5)
+val LightOnBackground   = Color(0xFF0D1F1C)
+val LightOnSurface      = Color(0xFF0D1F1C)
+val LightOnSurfaceVar   = Color(0xFF4F6360)
 
 // ═══════════════════════════════════════════════════════════
-// Status Colors — Order Status Chips (Dark)
+// Surface Palette — Dark
 // ═══════════════════════════════════════════════════════════
-// Not just lighter — carefully adjusted for dark surface readability
 
-val StatusPendingDark       = Color(0xFFFFCC80)
-val StatusPendingBgDark     = Color(0xFF3A2500)
-val StatusConfirmedDark     = Color(0xFF90CAF9)
-val StatusConfirmedBgDark   = Color(0xFF0A2744)
-val StatusDeliveredDark     = Color(0xFF80CBC4)
-val StatusDeliveredBgDark   = Color(0xFF003831)
-val StatusCompletedDark     = Color(0xFFA5D6A7)
-val StatusCompletedBgDark   = Color(0xFF0A2E0B)
-val StatusCancelledDark     = Color(0xFFEF9A9A)
-val StatusCancelledBgDark   = Color(0xFF3B0A0A)
+val DarkBackground      = Color(0xFF0F1413)
+val DarkSurface         = Color(0xFF131A18)
+val DarkSurfaceVariant  = Color(0xFF1C2624)
+val DarkSurfaceElev     = Color(0xFF222E2B)
+val DarkOutline         = Color(0xFF3A4F4B)
+val DarkOutlineVariant  = Color(0xFF2D3D39)
+val DarkOnBackground    = Color(0xFFE4EEEB)
+val DarkOnSurface       = Color(0xFFE4EEEB)
+val DarkOnSurfaceVar    = Color(0xFF8FA09B)
 
-// Alert icon backgrounds (Dark) — appropriately muted for dark surfaces
-val AlertOverdueIconBgDark    = Color(0xFF3B1212)
-val AlertPaymentIconBgDark    = Color(0xFF3A2000)
-val AlertStockIconBgDark      = Color(0xFF0E2040)
-val AlertBookingIconBgDark    = Color(0xFF0A2B14)
+// ═══════════════════════════════════════════════════════════
+// Semantic Status Colors — Success / Paid / Returned (Green)
+// ═══════════════════════════════════════════════════════════
+
+val StatusCompleted     = Color(0xFF166534)   // Dark green text/icon
+val StatusCompletedBg   = Color(0xFFDCFCE7)   // Light green badge bg
+val StatusCompletedBorder = Color(0xFFBBF7D0)
+
+val StatusCompletedDark   = Color(0xFFA5D6A7)
+val StatusCompletedBgDark = Color(0xFF0A2E0B)
+
+// Delivered (teal)
+val StatusDelivered     = Color(0xFF0E5247)
+val StatusDeliveredBg   = Color(0xFFE0F4F1)
+val StatusDeliveredDark = Color(0xFF80CBC4)
+val StatusDeliveredBgDark = Color(0xFF003831)
+
+// ═══════════════════════════════════════════════════════════
+// Semantic Status Colors — Warning / Pending (Amber)
+// ═══════════════════════════════════════════════════════════
+
+val StatusPending       = Color(0xFFB45309)
+val StatusPendingBg     = Color(0xFFFEF3C7)
+val StatusPendingBorder = Color(0xFFFDE68A)
+
+val StatusPendingDark   = Color(0xFFFFCC80)
+val StatusPendingBgDark = Color(0xFF3A2500)
+
+// ═══════════════════════════════════════════════════════════
+// Semantic Status Colors — Critical / Overdue / Unpaid (Red)
+// ═══════════════════════════════════════════════════════════
+
+val StatusCancelled     = Color(0xFF991B1B)
+val StatusCancelledBg   = Color(0xFFFEE2E2)
+val StatusCancelledBorder = Color(0xFFFECACA)
+
+val StatusCancelledDark   = Color(0xFFEF9A9A)
+val StatusCancelledBgDark = Color(0xFF3B0A0A)
+
+// ═══════════════════════════════════════════════════════════
+// Semantic Status Colors — Info / Confirmed (Blue)
+// ═══════════════════════════════════════════════════════════
+
+val StatusConfirmed     = Color(0xFF1E40AF)
+val StatusConfirmedBg   = Color(0xFFDBEAFE)
+val StatusConfirmedBorder = Color(0xFFBFDBFE)
+
+val StatusConfirmedDark   = Color(0xFF90CAF9)
+val StatusConfirmedBgDark = Color(0xFF0A2744)
 
 // ═══════════════════════════════════════════════════════════
 // Payment Status Colors
 // ═══════════════════════════════════════════════════════════
 
-val PaymentUnpaid       = Color(0xFFE53935)
-val PaymentUnpaidBg     = Color(0xFFFFEBEE)
-val PaymentPartial      = Color(0xFFFB8C00)
-val PaymentPartialBg    = Color(0xFFFFF3E0)
-val PaymentPaid         = Color(0xFF43A047)
-val PaymentPaidBg       = Color(0xFFE8F5E9)
+val PaymentUnpaid       = Color(0xFF991B1B)
+val PaymentUnpaidBg     = Color(0xFFFEE2E2)
+val PaymentPartial      = Color(0xFFB45309)
+val PaymentPartialBg    = Color(0xFFFEF3C7)
+val PaymentPaid         = Color(0xFF166534)
+val PaymentPaidBg       = Color(0xFFDCFCE7)
 
 val PaymentUnpaidDark   = Color(0xFFEF9A9A)
 val PaymentUnpaidBgDark = Color(0xFF3B0A0A)
@@ -126,3 +152,22 @@ val PaymentPartialDark  = Color(0xFFFFCC80)
 val PaymentPartialBgDark = Color(0xFF3A2500)
 val PaymentPaidDark     = Color(0xFFA5D6A7)
 val PaymentPaidBgDark   = Color(0xFF0A2E0B)
+
+// ═══════════════════════════════════════════════════════════
+// Alert Icon Backgrounds — Dashboard (Light)
+// ═══════════════════════════════════════════════════════════
+
+val AlertOverdueIconBg    = Color(0xFFFEE2E2)
+val AlertOverdueIconColor = Color(0xFF991B1B)
+val AlertPaymentIconBg    = Color(0xFFFEF3C7)
+val AlertPaymentIconColor = Color(0xFFB45309)
+val AlertStockIconBg      = Color(0xFFDBEAFE)
+val AlertStockIconColor   = Color(0xFF1E40AF)
+val AlertBookingIconBg    = Color(0xFFDCFCE7)
+val AlertBookingIconColor = Color(0xFF166534)
+
+// Alert Icon Backgrounds — Dashboard (Dark)
+val AlertOverdueIconBgDark    = Color(0xFF3B0A0A)
+val AlertPaymentIconBgDark    = Color(0xFF3A2500)
+val AlertStockIconBgDark      = Color(0xFF0E2040)
+val AlertBookingIconBgDark    = Color(0xFF0A2B14)

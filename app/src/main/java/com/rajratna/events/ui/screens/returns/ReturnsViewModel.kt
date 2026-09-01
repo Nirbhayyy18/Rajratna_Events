@@ -39,7 +39,7 @@ data class ReturnedOrder(
  * Return entry for the record return dialog.
  */
 data class ReturnEntry(
-    val orderItemId: Long,
+    val orderItemId: String,
     val itemName: String,
     val givenQuantity: Int,
     val alreadyReturned: Int,
@@ -62,7 +62,7 @@ data class ReturnsState(
     val filteredReturnedOrders: List<ReturnedOrder> = emptyList(),
     // Record Return dialog state
     val showRecordReturn: Boolean = false,
-    val recordReturnOrderId: Long = 0,
+    val recordReturnOrderId: String = "",
     val returnEntries: List<ReturnEntry> = emptyList(),
     val isSaving: Boolean = false
 )
@@ -181,7 +181,7 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
 
     // ── Record Return ───────────────────────────────────────
 
-    fun openRecordReturn(orderId: Long) {
+    fun openRecordReturn(orderId: String) {
         viewModelScope.launch {
             val items = repository.getOrderItemsList(orderId)
             val entries = items
@@ -207,12 +207,12 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
     fun closeRecordReturn() {
         _state.value = _state.value.copy(
             showRecordReturn = false,
-            recordReturnOrderId = 0,
+            recordReturnOrderId = "",
             returnEntries = emptyList()
         )
     }
 
-    fun updateReturnedNow(orderItemId: Long, value: Int) {
+    fun updateReturnedNow(orderItemId: String, value: Int) {
         val entries = _state.value.returnEntries.map { entry ->
             if (entry.orderItemId == orderItemId) {
                 entry.copy(returnedNow = value.coerceIn(0, entry.pendingQuantity))

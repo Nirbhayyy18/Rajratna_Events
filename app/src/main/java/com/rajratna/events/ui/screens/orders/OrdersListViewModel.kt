@@ -161,7 +161,7 @@ class OrdersListViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun updateOrderStatus(orderId: Long, status: String) {
+    fun updateOrderStatus(orderId: String, status: String) {
         viewModelScope.launch {
             repository.updateOrderStatus(orderId, status)
         }

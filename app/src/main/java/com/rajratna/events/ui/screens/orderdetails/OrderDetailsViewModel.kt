@@ -23,9 +23,9 @@ class OrderDetailsViewModel(application: Application) : AndroidViewModel(applica
     private val _state = MutableStateFlow(OrderDetailsState())
     val state: StateFlow<OrderDetailsState> = _state.asStateFlow()
 
-    private var currentOrderId: Long = -1
+    private var currentOrderId: String = ""
 
-    fun loadOrder(orderId: Long) {
+    fun loadOrder(orderId: String) {
         if (currentOrderId == orderId) return
         currentOrderId = orderId
         
@@ -74,7 +74,7 @@ class OrderDetailsViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun recordReturn(returnEntries: Map<Long, Int>, onSuccess: () -> Unit) {
+    fun recordReturn(returnEntries: Map<String, Int>, onSuccess: () -> Unit) {
         viewModelScope.launch {
             repository.recordReturn(currentOrderId, returnEntries)
             onSuccess()

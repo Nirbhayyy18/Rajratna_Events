@@ -1,26 +1,25 @@
 package com.rajratna.events.data.entity
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+import com.google.firebase.firestore.DocumentId
 
 /**
  * Order placed by a customer.
  * Contains denormalized customer info for quick display in lists.
- * Financial totals are stored here; individual items are in OrderItem.
+ * Financial totals are stored here; individual items are in OrderItem subcollection.
+ * Stored in Firestore "orders" collection.
  */
-@Entity(tableName = "orders")
 data class Order(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
+    @DocumentId
+    val id: String = "",
     val billNumber: Int = 0,
-    val customerId: Long,
-    val customerName: String,
-    val customerMobile: String,
+    val customerId: String = "",
+    val customerName: String = "",
+    val customerMobile: String = "",
     val customerAddress: String = "",
-    val orderDate: Long,
-    val deliveryDate: Long,
-    val returnDate: Long,
-    val rentalDays: Int,
+    val orderDate: Long = 0L,
+    val deliveryDate: Long = 0L,
+    val returnDate: Long = 0L,
+    val rentalDays: Int = 0,
     val notes: String = "",
     val itemsTotal: Double = 0.0,
     val transportRent: Double = 0.0,
@@ -30,7 +29,8 @@ data class Order(
     val orderStatus: String = OrderStatus.PENDING,
     val paymentStatus: String = PaymentStatusType.UNPAID,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false
 )
 
 /**

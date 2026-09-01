@@ -29,9 +29,9 @@ class BillPreviewViewModel(application: Application) : AndroidViewModel(applicat
     private val _state = MutableStateFlow(BillPreviewState())
     val state: StateFlow<BillPreviewState> = _state.asStateFlow()
 
-    private var currentOrderId: Long = -1
+    private var currentOrderId: String = ""
 
-    fun loadBillPreview(orderId: Long) {
+    fun loadBillPreview(orderId: String) {
         if (currentOrderId == orderId) return
         currentOrderId = orderId
 

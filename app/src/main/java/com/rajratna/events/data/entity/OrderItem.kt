@@ -1,36 +1,22 @@
 package com.rajratna.events.data.entity
 
-import androidx.room.Entity
-import androidx.room.ForeignKey
-import androidx.room.Index
-import androidx.room.PrimaryKey
+import com.google.firebase.firestore.DocumentId
 
 /**
  * Line item within an order.
  * Stores snapshot of item name/rate at time of order creation.
+ * Stored in Firestore as subcollection "order_items" under each order document.
  */
-@Entity(
-    tableName = "order_items",
-    foreignKeys = [
-        ForeignKey(
-            entity = Order::class,
-            parentColumns = ["id"],
-            childColumns = ["orderId"],
-            onDelete = ForeignKey.CASCADE
-        )
-    ],
-    indices = [Index("orderId")]
-)
 data class OrderItem(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    val orderId: Long,
-    val itemId: Long,
-    val itemName: String,
-    val quantity: Int,
-    val ratePerDay: Double,
-    val rentalDays: Int,
-    val totalAmount: Double,
+    @DocumentId
+    val id: String = "",
+    val orderId: String = "",
+    val itemId: String = "",
+    val itemName: String = "",
+    val quantity: Int = 0,
+    val ratePerDay: Double = 0.0,
+    val rentalDays: Int = 0,
+    val totalAmount: Double = 0.0,
     val returnedQuantity: Int = 0,
     val damagedQuantity: Int = 0,
     val isCustomerOwned: Boolean = false

@@ -1,6 +1,9 @@
 package com.rajratna.events.ui.screens.orders
 
 import android.app.DatePickerDialog
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -15,8 +18,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rajratna.events.data.entity.Order
@@ -24,16 +29,18 @@ import com.rajratna.events.data.entity.OrderStatus
 import com.rajratna.events.data.entity.PaymentStatusType
 import com.rajratna.events.ui.components.EmptyState
 import com.rajratna.events.ui.components.StatusChip
+import com.rajratna.events.ui.theme.*
 import com.rajratna.events.util.DateUtils
 import com.rajratna.events.util.WhatsAppUtils
 import com.rajratna.events.util.toRupee
+import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun OrdersListScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToOrder: (Long) -> Unit,
+    onNavigateToOrder: (String) -> Unit,
     onNavigateToNewOrder: () -> Unit,
     viewModel: OrdersListViewModel = viewModel()
 ) {
@@ -102,8 +109,8 @@ fun OrdersListScreen(
                     FilterChip(
                         selected = state.dateFilter == filter,
                         onClick = { viewModel.selectDateFilter(filter) },
-                        label = { Text(filter, style = MaterialTheme.typography.labelMedium) },
-                        shape = RoundedCornerShape(10.dp)
+                        label = { Text(filter, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium) },
+                        shape = RoundedCornerShape(50) // pill shape
                     )
                 }
                 // Calendar chip
@@ -112,7 +119,7 @@ fun OrdersListScreen(
                         selected = state.dateFilter == "Custom",
                         onClick = { showStartPicker = true },
                         label = { Text("📅", style = MaterialTheme.typography.labelMedium) },
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(50)
                     )
                 }
                 // Advanced filter chip
@@ -123,7 +130,7 @@ fun OrdersListScreen(
                         label = {
                             Icon(Icons.Default.FilterList, contentDescription = null, modifier = Modifier.size(16.dp))
                         },
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(50)
                     )
                 }
             }
@@ -188,7 +195,8 @@ fun OrdersListScreen(
                                     context, order.customerMobile,
                                     WhatsAppUtils.generatePaymentReminder(order)
                                 )
-                            }
+                            },
+                            modifier = Modifier.animateItemPlacement()
                         )
                     }
                     item { Spacer(Modifier.height(80.dp)) }
@@ -371,121 +379,138 @@ private fun OrderCard(
     order: Order,
     onClick: () -> Unit,
     onCall: () -> Unit,
-    onWhatsApp: () -> Unit
+    onWhatsApp: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    // Parse delivery date for calendar pod
+    val cal = Calendar.getInstance().apply { timeInMillis = order.deliveryDate }
+    val dayNum = SimpleDateFormat("dd", Locale.getDefault()).format(cal.time)
+    val monthAbbr = SimpleDateFormat("MMM", Locale.getDefault()).format(cal.time).uppercase()
+
     Card(
         onClick = onClick,
+        modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, pressedElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header: Bill No + Status
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
+
+            // ── Calendar Date Pod ──
+            Column(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "#${order.billNumber}",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = dayNum,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 22.sp
+                )
+                Text(
+                    text = monthAbbr,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusChip(order.orderStatus)
-                    StatusChip(order.paymentStatus)
-                }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.width(12.dp))
 
-            // Customer Info
-            Text(
-                text = order.customerName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = order.customerMobile,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            // Dates
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                Column {
-                    Text("Delivery", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(DateUtils.formatShortDate(order.deliveryDate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                }
-                Column {
-                    Text("Return", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(DateUtils.formatShortDate(order.returnDate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                }
-                Column {
-                    Text("Days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${order.rentalDays}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-            Spacer(Modifier.height(12.dp))
-
-            // Amount + Actions
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
+            // ── Main Content ──
+            Column(modifier = Modifier.weight(1f)) {
+                // Bill no + Status badges
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = order.grandTotal.toRupee(),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        text = "#${order.billNumber}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    if (order.balanceAmount > 0) {
-                        Text(
-                            text = "Balance: ${order.balanceAmount.toRupee()}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Medium
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        StatusChip(order.orderStatus)
+                        StatusChip(order.paymentStatus)
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalIconButton(
-                        onClick = onCall,
-                        modifier = Modifier.size(40.dp),
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                    ) {
-                        Icon(
-                            Icons.Default.Call,
-                            contentDescription = "Call",
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(20.dp)
-                        )
+
+                Spacer(Modifier.height(4.dp))
+
+                // Customer name
+                Text(
+                    text = order.customerName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = order.customerMobile,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                // Return date + days
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column {
+                        Text("Return", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(DateUtils.formatShortDate(order.returnDate), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                     }
-                    FilledTonalIconButton(
-                        onClick = onWhatsApp,
-                        modifier = Modifier.size(40.dp),
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = com.rajratna.events.ui.theme.StatusCompletedBg)
-                    ) {
-                        Icon(
-                            Icons.Default.Share,
-                            contentDescription = "WhatsApp",
-                            tint = com.rajratna.events.ui.theme.StatusCompleted,
-                            modifier = Modifier.size(20.dp)
+                    Column {
+                        Text("Days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${order.rentalDays}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(Modifier.height(10.dp))
+
+                // Amount + Action buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = order.grandTotal.toRupee(),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
+                        if (order.balanceAmount > 0) {
+                            Text(
+                                text = "Due: ${order.balanceAmount.toRupee()}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PaymentUnpaid,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilledTonalIconButton(
+                            onClick = onCall,
+                            modifier = Modifier.size(36.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = StatusConfirmedBg)
+                        ) {
+                            Icon(Icons.Default.Call, contentDescription = "Call", tint = StatusConfirmed, modifier = Modifier.size(18.dp))
+                        }
+                        FilledTonalIconButton(
+                            onClick = onWhatsApp,
+                            modifier = Modifier.size(36.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = StatusCompletedBg)
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = "WhatsApp", tint = StatusCompleted, modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
             }

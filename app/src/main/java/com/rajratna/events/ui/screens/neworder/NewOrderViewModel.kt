@@ -21,7 +21,7 @@ data class NewOrderState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isEditMode: Boolean = false,
-    val editOrderId: Long? = null,
+    val editOrderId: String? = null,
     // Customer
     val customerName: String = "",
     val mobileNumber: String = "",
@@ -41,13 +41,13 @@ data class NewOrderState(
     val advancePaid: String = "",
     val balanceAmount: Double = 0.0,
     // Stock validation
-    val availableStock: Map<Long, Int> = emptyMap(),
-    val rangeStockDetails: Map<Long, StockDetails> = emptyMap(),
-    val stockErrors: Map<Long, String> = emptyMap(),
+    val availableStock: Map<String, Int> = emptyMap(),
+    val rangeStockDetails: Map<String, StockDetails> = emptyMap(),
+    val stockErrors: Map<String, String> = emptyMap(),
     val isStockValid: Boolean = true,
     val isCheckingStock: Boolean = false,
     // Result
-    val savedOrderId: Long? = null,
+    val savedOrderId: String? = null,
     val errorMessage: String? = null
 )
 
@@ -78,7 +78,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     /**
      * Load existing order for editing.
      */
-    fun loadOrder(orderId: Long) {
+    fun loadOrder(orderId: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true)
             val order = repository.getOrderById(orderId) ?: return@launch
@@ -156,7 +156,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         _state.value = _state.value.copy(notes = notes)
     }
 
-    fun updateItemQuantity(itemId: Long, quantity: Int) {
+    fun updateItemQuantity(itemId: String, quantity: Int) {
         val entries = _state.value.itemEntries.map {
             if (it.item.id == itemId) it.copy(quantity = maxOf(0, quantity)) else it
         }
@@ -165,7 +165,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         validateStockLocally()
     }
 
-    fun updateItemCustomerOwned(itemId: Long, isCustomerOwned: Boolean) {
+    fun updateItemCustomerOwned(itemId: String, isCustomerOwned: Boolean) {
         val entries = _state.value.itemEntries.map {
             if (it.item.id == itemId) it.copy(isCustomerOwned = isCustomerOwned) else it
         }
@@ -239,7 +239,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
      */
     private fun validateStockLocally() {
         val s = _state.value
-        val errors = mutableMapOf<Long, String>()
+        val errors = mutableMapOf<String, String>()
 
         for (entry in s.itemEntries) {
             if (entry.quantity <= 0) continue
@@ -307,7 +307,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
             }
 
             val order = Order(
-                id = if (s.isEditMode) s.editOrderId!! else 0,
+                id = if (s.isEditMode) s.editOrderId!! else "",
                 customerId = customer.id,
                 customerName = s.customerName,
                 customerMobile = s.mobileNumber,
@@ -330,7 +330,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                 .filter { it.quantity > 0 }
                 .map { entry ->
                     OrderItem(
-                        orderId = 0, // Will be set by repository
+                        orderId = "", // Will be set by repository
                         itemId = entry.item.id,
                         itemName = entry.item.name,
                         quantity = entry.quantity,

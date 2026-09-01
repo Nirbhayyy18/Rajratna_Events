@@ -28,10 +28,10 @@ import com.rajratna.events.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrderDetailsScreen(
-    orderId: Long,
+    orderId: String,
     onNavigateBack: () -> Unit,
-    onEditOrder: (Long) -> Unit,
-    onNavigateToBillPreview: (Long) -> Unit = {},
+    onEditOrder: (String) -> Unit,
+    onNavigateToBillPreview: (String) -> Unit = {},
     viewModel: OrderDetailsViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -773,7 +773,7 @@ private fun PaymentDialog(maxAmount: Double, onDismiss: () -> Unit, onConfirm: (
 
 
 data class LocalReturnEntry(
-    val orderItemId: Long,
+    val orderItemId: String,
     val itemName: String,
     val quantity: Int,
     val alreadyReturned: Int,
