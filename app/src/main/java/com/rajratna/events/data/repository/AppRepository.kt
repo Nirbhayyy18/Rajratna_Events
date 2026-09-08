@@ -396,6 +396,18 @@ class AppRepository(
         ).await()
     }
 
+    suspend fun deleteOrder(orderId: String) {
+        if (orderId.isNotEmpty()) {
+            ordersCol.document(orderId).update(
+                mapOf(
+                    "deleted" to true,
+                    "orderStatus" to OrderStatus.CANCELLED,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+        }
+    }
+
     // ── Dashboard Aggregations ──────────────────────────────
     // Firestore doesn't support server-side aggregations like SUM/COUNT with filters,
     // so we fetch the relevant documents and compute client-side.
@@ -541,13 +553,13 @@ class AppRepository(
 
     suspend fun getRentedQuantities(): List<RentedQuantity> {
         val allOrders = getAllOrdersList()
-        val activeOrders = allOrders.filter {
+        val activeOrderIds = allOrders.filter {
             it.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED)
-        }
-        val allOrderItems = mutableListOf<OrderItem>()
-        for (order in activeOrders) {
-            allOrderItems.addAll(getOrderItemsList(order.id))
-        }
+        }.map { it.id }.toSet()
+
+        if (activeOrderIds.isEmpty()) return emptyList()
+
+        val allOrderItems = getAllOrderItemsList().filter { it.orderId in activeOrderIds }
         return allOrderItems
             .filter { !it.isCustomerOwned && (it.quantity - it.returnedQuantity - it.damagedQuantity) > 0 }
             .groupBy { it.itemId }
@@ -571,12 +583,12 @@ class AppRepository(
     }
 
     suspend fun getAllOrderItemsList(): List<OrderItem> {
-        val orders = getAllOrdersList()
-        val allItems = mutableListOf<OrderItem>()
-        for (order in orders) {
-            allItems.addAll(getOrderItemsList(order.id))
+        return try {
+            val snapshot = db.collectionGroup("order_items").get().await()
+            snapshot.toObjects(OrderItem::class.java)
+        } catch (e: Exception) {
+            emptyList()
         }
-        return allItems
     }
 
     suspend fun getStockDetailsForDate(
@@ -763,13 +775,13 @@ class AppRepository(
         val activeOrders = allOrders.filter {
             it.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED)
         }
-        val filteredOrders = activeOrders.filter {
+        val filteredOrderIds = activeOrders.filter {
             DateUtils.startOfDay(it.deliveryDate) <= selectedDate
-        }
-        val allOrderItems = mutableListOf<OrderItem>()
-        for (order in filteredOrders) {
-            allOrderItems.addAll(getOrderItemsList(order.id))
-        }
+        }.map { it.id }.toSet()
+
+        if (filteredOrderIds.isEmpty()) return emptyList()
+
+        val allOrderItems = getAllOrderItemsList().filter { it.orderId in filteredOrderIds }
         return allOrderItems
             .filter { !it.isCustomerOwned && (it.quantity - it.returnedQuantity - it.damagedQuantity) > 0 }
             .groupBy { it.itemId }
@@ -787,10 +799,10 @@ class AppRepository(
         val orders = getAllOrdersList().filter {
             it.deliveryDate >= start && it.deliveryDate < end && it.orderStatus != OrderStatus.CANCELLED
         }
-        val allItems = mutableListOf<OrderItem>()
-        for (order in orders) {
-            allItems.addAll(getOrderItemsList(order.id))
-        }
+        if (orders.isEmpty()) return emptyList()
+
+        val orderIds = orders.map { it.id }.toSet()
+        val allItems = getAllOrderItemsList().filter { it.orderId in orderIds }
         return allItems
             .groupBy { it.itemName }
             .map { (name, items) ->
@@ -831,17 +843,13 @@ class AppRepository(
         val allOrders = getAllOrdersList().filter {
             it.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED, OrderStatus.COMPLETED)
         }
-        val result = mutableListOf<Order>()
-        for (order in allOrders) {
-            val items = getOrderItemsList(order.id)
-            val hasPending = items.any {
-                !it.isCustomerOwned && it.quantity > (it.returnedQuantity + it.damagedQuantity)
-            }
-            if (hasPending) {
-                result.add(order)
-            }
-        }
-        return result.sortedBy { it.returnDate }
+        if (allOrders.isEmpty()) return emptyList()
+        val allItems = getAllOrderItemsList().filter { !it.isCustomerOwned }
+        val itemsByOrder = allItems.groupBy { it.orderId }
+        return allOrders.filter { order ->
+            val items = itemsByOrder[order.id] ?: emptyList()
+            items.any { it.quantity > (it.returnedQuantity + it.damagedQuantity) }
+        }.sortedBy { it.returnDate }
     }
 
     suspend fun getReturnedOrders(): List<Order> {
@@ -946,9 +954,11 @@ class AppRepository(
         isCustomerOwned: Boolean,
         paidAmount: Double,
         deliveryDate: Long,
-        waterJarItem: Item
+        waterJarItem: Item,
+        customRate: Double? = null
     ): String {
-        val totalAmount = quantity * waterJarItem.ratePerDay
+        val effectiveRate = customRate ?: waterJarItem.ratePerDay
+        val totalAmount = quantity * effectiveRate
         val paymentStatus = when {
             paidAmount >= totalAmount -> PaymentStatusType.PAID
             paidAmount > 0 -> PaymentStatusType.PARTIALLY_PAID
@@ -967,6 +977,7 @@ class AppRepository(
             notes = if (isCustomerOwned) "Quick Jar Entry (Customer Jar)" else "Quick Jar Entry",
             itemsTotal = totalAmount,
             transportRent = 0.0,
+            discountAmount = 0.0,
             grandTotal = totalAmount,
             advancePaid = paidAmount,
             balanceAmount = totalAmount - paidAmount,
@@ -978,7 +989,7 @@ class AppRepository(
             itemId = waterJarItem.id,
             itemName = waterJarItem.name,
             quantity = quantity,
-            ratePerDay = waterJarItem.ratePerDay,
+            ratePerDay = effectiveRate,
             rentalDays = 1,
             totalAmount = totalAmount,
             isCustomerOwned = isCustomerOwned
@@ -1044,11 +1055,11 @@ class AppRepository(
 
         val monthOrders = allOrders.filter { it.deliveryDate in monthStart until monthEnd }
 
-        val allOrderItems = mutableListOf<Pair<String, List<OrderItem>>>()
-        for (order in allOrders) {
-            allOrderItems.add(order.id to getOrderItemsList(order.id))
-        }
-        val orderItemsByOrder = allOrderItems.toMap()
+        val allOrderIds = allOrders.map { it.id }.toSet()
+        val allOrderItems = if (allOrderIds.isNotEmpty()) {
+            getAllOrderItemsList().filter { it.orderId in allOrderIds }
+        } else emptyList()
+        val orderItemsByOrder = allOrderItems.groupBy { it.orderId }
 
         // This month jar count (Water Jar only)
         var thisMonthJarCount = 0
@@ -1118,9 +1129,15 @@ class AppRepository(
         val allOrders = getAllOrdersList()
             .filter { it.customerId == customerId && it.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED) }
 
+        if (allOrders.isEmpty()) return emptyList()
+
+        val activeOrderIds = allOrders.map { it.id }.toSet()
+        val allOrderItems = getAllOrderItemsList().filter { it.orderId in activeOrderIds }
+        val itemsByOrder = allOrderItems.groupBy { it.orderId }
+
         val results = mutableListOf<PendingJarReturn>()
         for (order in allOrders) {
-            val items = getOrderItemsList(order.id)
+            val items = itemsByOrder[order.id] ?: emptyList()
             for (item in items) {
                 if (item.itemName.equals("Water Jar", ignoreCase = true) && !item.isCustomerOwned) {
                     val pending = item.quantity - item.returnedQuantity - item.damagedQuantity
@@ -1146,9 +1163,15 @@ class AppRepository(
             .filter { it.customerId == customerId && it.orderStatus != OrderStatus.CANCELLED }
             .sortedByDescending { it.deliveryDate }
 
+        if (allOrders.isEmpty()) return emptyList()
+
+        val candidateOrderIds = allOrders.map { it.id }.toSet()
+        val allOrderItems = getAllOrderItemsList().filter { it.orderId in candidateOrderIds }
+        val itemsByOrder = allOrderItems.groupBy { it.orderId }
+
         val results = mutableListOf<JarEntry>()
         for (order in allOrders) {
-            val items = getOrderItemsList(order.id)
+            val items = itemsByOrder[order.id] ?: emptyList()
             val jarItem = items.find { it.itemName.equals("Water Jar", ignoreCase = true) }
             if (jarItem != null) {
                 results.add(JarEntry(
@@ -1211,16 +1234,28 @@ class AppRepository(
     }
 
     fun getPaymentsInRange(start: Long, end: Long): Flow<List<Payment>> = flow {
-        val allOrders = getAllOrdersList()
-        val allPayments = mutableListOf<Payment>()
-        for (order in allOrders) {
-            val payments = ordersCol.document(order.id).collection("payments")
+        try {
+            val payments = db.collectionGroup("payments")
                 .whereGreaterThanOrEqualTo("paymentDate", start)
                 .whereLessThan("paymentDate", end)
                 .get().await()
-            allPayments.addAll(payments.toObjects(Payment::class.java))
+                .toObjects(Payment::class.java)
+            emit(payments.sortedByDescending { it.paymentDate })
+        } catch (e: Exception) {
+            emit(emptyList())
         }
-        emit(allPayments.sortedByDescending { it.paymentDate })
+    }
+
+    suspend fun getPaymentsInRangeList(start: Long, end: Long): List<Payment> {
+        return try {
+            val snap = db.collectionGroup("payments")
+                .whereGreaterThanOrEqualTo("paymentDate", start)
+                .whereLessThan("paymentDate", end)
+                .get().await()
+            snap.toObjects(Payment::class.java)
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     suspend fun getTotalPaidForOrder(orderId: String): Double {
@@ -1234,26 +1269,24 @@ class AppRepository(
     }
 
     suspend fun getTotalPaymentReceived(start: Long, end: Long): Double {
-        val allOrders = getAllOrdersList()
-        var total = 0.0
-        for (order in allOrders) {
-            val payments = ordersCol.document(order.id).collection("payments")
+        return try {
+            val snap = db.collectionGroup("payments")
                 .whereGreaterThanOrEqualTo("paymentDate", start)
                 .whereLessThan("paymentDate", end)
                 .get().await()
-            total += payments.toObjects(Payment::class.java).sumOf { it.amount }
+            snap.toObjects(Payment::class.java).sumOf { it.amount }
+        } catch (e: Exception) {
+            0.0
         }
-        return total
     }
 
     suspend fun getOverallTotalReceived(): Double {
-        val allOrders = getAllOrdersList()
-        var total = 0.0
-        for (order in allOrders) {
-            val payments = ordersCol.document(order.id).collection("payments").get().await()
-            total += payments.toObjects(Payment::class.java).sumOf { it.amount }
+        return try {
+            val snap = db.collectionGroup("payments").get().await()
+            snap.toObjects(Payment::class.java).sumOf { it.amount }
+        } catch (e: Exception) {
+            0.0
         }
-        return total
     }
 
     suspend fun recordPayment(payment: Payment) {

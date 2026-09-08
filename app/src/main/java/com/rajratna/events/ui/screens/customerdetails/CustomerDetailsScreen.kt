@@ -435,8 +435,8 @@ fun CustomerDetailsScreen(
             jarStats = jarStats,
             jarRate = state.waterJarRate,
             availableStock = state.availableJarStock,
-            onSave = { quantity, isCustomerOwned, paidAmount, deliveryDate ->
-                viewModel.saveQuickJarEntry(quantity, isCustomerOwned, paidAmount, deliveryDate)
+            onSave = { quantity, isCustomerOwned, paidAmount, deliveryDate, customRate ->
+                viewModel.saveQuickJarEntry(quantity, isCustomerOwned, paidAmount, deliveryDate, customRate)
             },
             onDismiss = { viewModel.dismissQuickJar() }
         )

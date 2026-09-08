@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.rajratna.events.RajratnaApp
 import com.rajratna.events.data.entity.Customer
 import com.rajratna.events.data.entity.Order
+import com.rajratna.events.data.entity.OrderStatus
 import com.rajratna.events.data.repository.CustomerJarStats
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -39,42 +40,111 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
     private val _state = MutableStateFlow(CustomersState())
     val state: StateFlow<CustomersState> = _state.asStateFlow()
 
+    private var allLoadedCustomers: List<CustomerWithStats> = emptyList()
+
     init { loadCustomers() }
 
     private fun loadCustomers() {
         viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true)
             repository.getAllCustomers().collect { customers ->
-                val withStats = customers.map { customer ->
-                    var totalOrders = 0; var totalAmount = 0.0; var pendingBalance = 0.0
-                    repository.getOrdersByCustomer(customer.id).first().let { orders ->
-                        totalOrders = orders.size
-                        totalAmount = orders.filter { it.orderStatus != "Cancelled" }.sumOf { it.grandTotal }
-                        pendingBalance = orders.filter { it.orderStatus != "Cancelled" }.sumOf { it.balanceAmount }
-                    }
-                    val jarStats = repository.getCustomerJarStats(customer.id)
-                    CustomerWithStats(customer, totalOrders, totalAmount, totalAmount - pendingBalance, pendingBalance, jarStats)
+                val allOrders = repository.getAllOrdersList()
+                val allJarItems = repository.getAllOrderItemsList().filter {
+                    it.itemName.equals("Water Jar", ignoreCase = true)
                 }
-                _state.value = _state.value.copy(customers = withStats, isLoading = false)
+
+                val jarItemsByOrder = allJarItems.groupBy { it.orderId }
+                val ordersByCustomer = allOrders.groupBy { it.customerId }
+                val monthStart = com.rajratna.events.util.DateUtils.startOfThisMonth()
+                val monthEnd = com.rajratna.events.util.DateUtils.endOfThisMonth()
+
+                val withStats = customers.map { customer ->
+                    val custOrders = ordersByCustomer[customer.id] ?: emptyList()
+                    val activeOrders = custOrders.filter { it.orderStatus != OrderStatus.CANCELLED }
+                    val totalOrders = custOrders.size
+                    val totalAmount = activeOrders.sumOf { it.grandTotal }
+                    val pendingBalance = activeOrders.sumOf { it.balanceAmount }
+                    val totalPaid = totalAmount - pendingBalance
+
+                    val monthOrders = activeOrders.filter { it.deliveryDate in monthStart until monthEnd }
+                    var thisMonthJarCount = 0
+                    var thisMonthJarAmount = 0.0
+                    for (order in monthOrders) {
+                        val items = jarItemsByOrder[order.id] ?: emptyList()
+                        for (item in items) {
+                            thisMonthJarCount += item.quantity
+                            thisMonthJarAmount += item.totalAmount
+                        }
+                    }
+
+                    var pendingReturnJars = 0
+                    for (order in activeOrders) {
+                        if (order.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED)) {
+                            val items = jarItemsByOrder[order.id] ?: emptyList()
+                            for (item in items) {
+                                if (!item.isCustomerOwned) {
+                                    val pending = item.quantity - item.returnedQuantity - item.damagedQuantity
+                                    if (pending > 0) pendingReturnJars += pending
+                                }
+                            }
+                        }
+                    }
+
+                    var lastJarQuantity = 0
+                    var lastJarDate = 0L
+                    var lastJarIsCustomerOwned = false
+                    val sortedOrders = activeOrders.sortedByDescending { it.deliveryDate }
+                    for (order in sortedOrders) {
+                        val items = jarItemsByOrder[order.id] ?: emptyList()
+                        if (items.isNotEmpty()) {
+                            val first = items.first()
+                            lastJarQuantity = first.quantity
+                            lastJarDate = order.deliveryDate
+                            lastJarIsCustomerOwned = first.isCustomerOwned
+                            break
+                        }
+                    }
+
+                    val jarStats = CustomerJarStats(
+                        thisMonthJarCount = thisMonthJarCount,
+                        thisMonthJarAmount = thisMonthJarAmount,
+                        thisMonthPaid = 0.0,
+                        totalPaid = totalPaid,
+                        pendingBalance = pendingBalance,
+                        pendingReturnJars = pendingReturnJars,
+                        lastJarQuantity = lastJarQuantity,
+                        lastJarDate = lastJarDate,
+                        lastJarIsCustomerOwned = lastJarIsCustomerOwned
+                    )
+
+                    CustomerWithStats(customer, totalOrders, totalAmount, totalPaid, pendingBalance, jarStats)
+                }
+
+                allLoadedCustomers = withStats
+                val currentQuery = _state.value.searchQuery
+                val displayed = if (currentQuery.isBlank()) {
+                    withStats
+                } else {
+                    filterCustomers(withStats, currentQuery)
+                }
+                _state.value = _state.value.copy(customers = displayed, isLoading = false)
             }
         }
     }
 
     fun updateSearch(query: String) {
-        _state.value = _state.value.copy(searchQuery = query)
-        viewModelScope.launch {
-            if (query.isBlank()) {
-                loadCustomers()
-            } else {
-                repository.searchCustomers(query).collect { customers ->
-                    val withStats = customers.map { c ->
-                        val orders = repository.getOrdersByCustomer(c.id).first()
-                        val active = orders.filter { it.orderStatus != "Cancelled" }
-                        val jarStats = repository.getCustomerJarStats(c.id)
-                        CustomerWithStats(c, orders.size, active.sumOf { it.grandTotal }, active.sumOf { it.grandTotal - it.balanceAmount }, active.sumOf { it.balanceAmount }, jarStats)
-                    }
-                    _state.value = _state.value.copy(customers = withStats, isLoading = false)
-                }
-            }
+        _state.value = _state.value.copy(
+            searchQuery = query,
+            customers = if (query.isBlank()) allLoadedCustomers else filterCustomers(allLoadedCustomers, query)
+        )
+    }
+
+    private fun filterCustomers(list: List<CustomerWithStats>, query: String): List<CustomerWithStats> {
+        val q = query.lowercase().trim()
+        return list.filter {
+            it.customer.name.lowercase().contains(q) ||
+            it.customer.mobileNumber.contains(q) ||
+            it.customer.address.lowercase().contains(q)
         }
     }
 
@@ -101,11 +171,11 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
         _state.value = _state.value.copy(showQuickJar = false, selectedCustomer = null, selectedCustomerJarStats = null)
     }
 
-    fun saveQuickJarEntry(quantity: Int, isCustomerOwned: Boolean, paidAmount: Double, deliveryDate: Long) {
+    fun saveQuickJarEntry(quantity: Int, isCustomerOwned: Boolean, paidAmount: Double, deliveryDate: Long, customRate: Double? = null) {
         val customer = _state.value.selectedCustomer ?: return
         viewModelScope.launch {
             val waterJar = repository.getWaterJarItem() ?: return@launch
-            repository.saveQuickJarEntry(customer, quantity, isCustomerOwned, paidAmount, deliveryDate, waterJar)
+            repository.saveQuickJarEntry(customer, quantity, isCustomerOwned, paidAmount, deliveryDate, waterJar, customRate)
             _state.value = _state.value.copy(showQuickJar = false, selectedCustomer = null, selectedCustomerJarStats = null, actionMessage = "Jar entry saved for ${customer.name}")
             loadCustomers()
         }
@@ -183,6 +253,49 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
             repository.recordLumpSumPayment(customer, amount, paymentMethod)
             _state.value = _state.value.copy(showRecordPayment = false, selectedCustomer = null, selectedCustomerJarStats = null, actionMessage = "Payment of ₹${amount.toInt()} recorded for ${customer.name}")
             loadCustomers()
+        }
+    }
+
+    fun addCustomer(
+        name: String,
+        mobileNumber: String,
+        address: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val trimmedName = name.trim()
+        val trimmedMobile = mobileNumber.trim()
+        val trimmedAddress = address.trim()
+
+        if (trimmedName.isBlank()) {
+            onError("Customer name is required")
+            return
+        }
+        if (trimmedMobile.isBlank() || trimmedMobile.length < 10) {
+            onError("Valid 10-digit mobile number is required")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val existing = repository.getCustomerByMobile(trimmedMobile)
+                if (existing != null) {
+                    onError("Customer with mobile $trimmedMobile already exists: ${existing.name}")
+                    return@launch
+                }
+                repository.insertCustomer(
+                    Customer(
+                        name = trimmedName,
+                        mobileNumber = trimmedMobile,
+                        address = trimmedAddress
+                    )
+                )
+                _state.value = _state.value.copy(actionMessage = "Customer $trimmedName added successfully")
+                loadCustomers()
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "Failed to add customer")
+            }
         }
     }
 

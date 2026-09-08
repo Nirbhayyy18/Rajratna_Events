@@ -57,6 +57,13 @@ class OrderDetailsViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    fun deleteOrder(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            repository.deleteOrder(currentOrderId)
+            onSuccess()
+        }
+    }
+
     fun recordPayment(amount: Double, method: String, notes: String, onSuccess: () -> Unit) {
         val order = _state.value.order ?: return
         viewModelScope.launch {

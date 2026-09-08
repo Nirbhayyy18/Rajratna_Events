@@ -37,6 +37,7 @@ fun OrderDetailsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showPaymentDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     var showCancelConfirm by remember { mutableStateOf(false) }
     var showDeliverConfirm by remember { mutableStateOf(false) }
     var showRecordReturnDialog by remember { mutableStateOf(false) }
@@ -77,6 +78,9 @@ fun OrderDetailsScreen(
                     if (order != null) {
                         IconButton(onClick = { onEditOrder(orderId) }) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit")
+                        }
+                        IconButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
@@ -280,6 +284,7 @@ fun OrderDetailsScreen(
                             Text("💰 Bill Summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             AmountRow("Items Total", order.itemsTotal)
                             if (order.transportRent > 0) AmountRow("Transport Rent", order.transportRent)
+                            if (order.discountAmount > 0) AmountRow("Discount", -order.discountAmount, color = StatusCompleted)
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             AmountRow("Grand Total", order.grandTotal, isBold = true, color = MaterialTheme.colorScheme.primary)
                             AmountRow("Paid", order.grandTotal - order.balanceAmount, color = StatusCompleted)
@@ -332,7 +337,9 @@ fun OrderDetailsScreen(
                             if (order.orderStatus == OrderStatus.PENDING) add(OrderStatus.CONFIRMED to "Confirm Order")
                             if (order.orderStatus == OrderStatus.CONFIRMED) add(OrderStatus.DELIVERED to "Mark Delivered")
                             if (order.orderStatus == OrderStatus.DELIVERED) add(OrderStatus.COMPLETED to "Mark Completed")
-                            if (order.orderStatus != OrderStatus.CANCELLED && order.orderStatus != OrderStatus.COMPLETED) add(OrderStatus.CANCELLED to "Cancel Order")
+                            if (order.orderStatus != OrderStatus.CANCELLED && order.orderStatus != OrderStatus.DELIVERED && order.orderStatus != OrderStatus.COMPLETED) {
+                                add(OrderStatus.CANCELLED to "Cancel Order")
+                            }
                         }
                         statusActions.forEach { (status, label) ->
                             OutlinedButton(onClick = {
@@ -389,24 +396,53 @@ fun OrderDetailsScreen(
     if (showCancelConfirm && order != null) {
         AlertDialog(
             onDismissRequest = { showCancelConfirm = false },
-            title = { Text("Cancel Order?") },
-            text = { Text("Are you sure you want to cancel this order? Cancelled orders will not count in stock or income.") },
+            title = { Text("Cancel & Delete Order?") },
+            text = { Text("Are you sure you want to cancel Order #${order.billNumber}? Cancelled orders will be removed from your records.") },
             confirmButton = {
                 Button(
                     onClick = {
                         showCancelConfirm = false
-                        viewModel.updateStatus(OrderStatus.CANCELLED) {
-                            android.widget.Toast.makeText(context, "Order cancelled successfully", android.widget.Toast.LENGTH_SHORT).show()
+                        viewModel.deleteOrder {
+                            android.widget.Toast.makeText(context, "Order cancelled and deleted", android.widget.Toast.LENGTH_SHORT).show()
+                            onNavigateBack()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Cancel Order")
+                    Text("Cancel & Delete")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showCancelConfirm = false }) {
                     Text("No")
+                }
+            }
+        )
+    }
+
+    // Confirm Delete Dialog
+    if (showDeleteConfirm && order != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Order?") },
+            text = { Text("Are you sure you want to delete Order #${order.billNumber}? This will remove the order permanently.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirm = false
+                        viewModel.deleteOrder {
+                            android.widget.Toast.makeText(context, "Order deleted successfully", android.widget.Toast.LENGTH_SHORT).show()
+                            onNavigateBack()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
                 }
             }
         )

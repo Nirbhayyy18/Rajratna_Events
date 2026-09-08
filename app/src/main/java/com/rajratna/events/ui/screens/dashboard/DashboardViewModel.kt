@@ -137,22 +137,86 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val tomorrowStart = DateUtils.startOfTomorrow()
         val tomorrowEnd = DateUtils.endOfTomorrow()
 
-        val itemStocks = loadStockForDate(selectedStockDate)
+        // Fetch datasets once
         val allOrders = repository.getAllOrdersList()
-        val pendingReturnOrders = repository.getOrdersWithPendingReturns()
+        val allOrderItems = repository.getAllOrderItemsList()
+        val allItems = repository.getAllItemsList().filter { it.isActive }
+        val payments = repository.getPaymentsInRangeList(selectedOverviewDate, selectedOverviewEnd)
+
+        val itemsByOrder = allOrderItems.groupBy { it.orderId }
+
+        // Stock calculation in-memory
+        val isStockToday = selectedStockDate == todayStart
+        val activeOrdersForStock = allOrders.filter {
+            it.orderStatus == OrderStatus.CONFIRMED || it.orderStatus == OrderStatus.DELIVERED
+        }
+
+        val itemStocks = allItems.map { item ->
+            var outQty = 0
+            var riskQty = 0
+            if (isStockToday) {
+                for (order in activeOrdersForStock) {
+                    val orderDeliveryStart = DateUtils.startOfDay(order.deliveryDate)
+                    if (orderDeliveryStart <= todayStart) {
+                        val orderItems = itemsByOrder[order.id] ?: emptyList()
+                        val match = orderItems.find { it.itemId == item.id && !it.isCustomerOwned }
+                        if (match != null) {
+                            val pending = match.quantity - match.returnedQuantity - match.damagedQuantity
+                            if (pending > 0) outQty += pending
+                        }
+                    }
+                }
+            } else {
+                for (order in activeOrdersForStock) {
+                    val orderItems = itemsByOrder[order.id] ?: emptyList()
+                    val match = orderItems.find { it.itemId == item.id && !it.isCustomerOwned }
+                    if (match != null) {
+                        val pending = match.quantity - match.returnedQuantity - match.damagedQuantity
+                        if (pending > 0) {
+                            val orderDeliveryStart = DateUtils.startOfDay(order.deliveryDate)
+                            val orderReturnStart = DateUtils.startOfDay(order.returnDate)
+                            if (orderDeliveryStart <= selectedStockDate && selectedStockDate <= orderReturnStart) {
+                                outQty += pending
+                            } else if (orderDeliveryStart < selectedStockDate && orderReturnStart < selectedStockDate) {
+                                riskQty += pending
+                            }
+                        }
+                    }
+                }
+            }
+
+            val available = maxOf(0, item.totalStock - outQty)
+            ItemStockInfo(
+                itemId = item.id,
+                name = item.name,
+                totalStock = item.totalStock,
+                availableStock = available,
+                outStock = outQty,
+                lowStockAlert = item.lowStockAlert,
+                isLowStock = item.lowStockAlert > 0 && available <= item.lowStockAlert,
+                riskStock = riskQty
+            )
+        }
+
+        // Pending returns in-memory
+        val pendingReturnOrders = allOrders.filter {
+            it.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED, OrderStatus.COMPLETED) &&
+            (itemsByOrder[it.id] ?: emptyList()).any { oi ->
+                !oi.isCustomerOwned && oi.quantity > (oi.returnedQuantity + oi.damagedQuantity)
+            }
+        }.sortedBy { it.returnDate }
 
         val overdueReturnCount = pendingReturnOrders.count { it.returnDate < todayStart }
         val pendingPaymentsCount = allOrders.count { it.orderStatus != OrderStatus.CANCELLED && it.balanceAmount > 0.0 }
         val lowStockCount = itemStocks.count { it.isLowStock }
         val tomorrowBookings = allOrders.filter {
             it.orderStatus != OrderStatus.CANCELLED &&
-                it.deliveryDate >= tomorrowStart &&
-                it.deliveryDate < tomorrowEnd
+            it.deliveryDate >= tomorrowStart &&
+            it.deliveryDate < tomorrowEnd
         }
 
-        var tomorrowItemCount = 0
-        for (order in tomorrowBookings) {
-            tomorrowItemCount += repository.getOrderItemsList(order.id)
+        val tomorrowItemCount = tomorrowBookings.sumOf { order ->
+            (itemsByOrder[order.id] ?: emptyList())
                 .filter { !it.isCustomerOwned }
                 .sumOf { it.quantity }
         }
@@ -160,58 +224,69 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val upcomingOrders = allOrders
             .filter {
                 it.orderStatus != OrderStatus.CANCELLED &&
-                    it.orderStatus != OrderStatus.COMPLETED &&
-                    it.deliveryDate >= todayStart
+                it.orderStatus != OrderStatus.COMPLETED &&
+                it.deliveryDate >= todayStart
             }
             .sortedBy { it.deliveryDate }
             .take(2)
-        val upcomingDeliveries = mutableListOf<UpcomingDeliveryInfo>()
-        for (order in upcomingOrders) {
-            val itemSummary = repository.getOrderItemsList(order.id)
+
+        val upcomingDeliveries = upcomingOrders.map { order ->
+            val itemSummary = (itemsByOrder[order.id] ?: emptyList())
                 .filter { !it.isCustomerOwned }
                 .take(3)
                 .joinToString(", ") { "${it.itemName} x${it.quantity}" }
                 .ifBlank { "No items" }
 
-            upcomingDeliveries.add(UpcomingDeliveryInfo(
+            UpcomingDeliveryInfo(
                 orderId = order.id,
                 deliveryDate = order.deliveryDate,
                 customerName = order.customerName,
                 itemSummary = itemSummary
-            ))
+            )
         }
 
-        val pendingReturnOrdersFromRepo = repository.getPendingReturnOrders(todayEnd, limit = 3)
-        val pendingReturns = mutableListOf<PendingReturnPreview>()
-        for (order in pendingReturnOrdersFromRepo) {
-            val orderItems = repository.getOrderItemsList(order.id)
-            val pendingItems = orderItems
-                .filter { !it.isCustomerOwned && it.quantity > (it.returnedQuantity + it.damagedQuantity) }
-                .map { PendingItemInfo(it.itemName, it.quantity - it.returnedQuantity - it.damagedQuantity) }
+        val pendingReturns = pendingReturnOrders
+            .filter { it.returnDate <= todayEnd }
+            .take(3)
+            .map { order ->
+                val orderItems = itemsByOrder[order.id] ?: emptyList()
+                val pendingItems = orderItems
+                    .filter { !it.isCustomerOwned && it.quantity > (it.returnedQuantity + it.damagedQuantity) }
+                    .map { PendingItemInfo(it.itemName, it.quantity - it.returnedQuantity - it.damagedQuantity) }
 
-            pendingReturns.add(PendingReturnPreview(
-                orderId = order.id,
-                billNumber = order.billNumber,
-                customerName = order.customerName,
-                customerMobile = order.customerMobile,
-                returnDate = order.returnDate,
-                isOverdue = order.returnDate < todayStart,
-                isDueToday = order.returnDate in todayStart until todayEnd,
-                pendingItems = pendingItems
-            ))
-        }
+                PendingReturnPreview(
+                    orderId = order.id,
+                    billNumber = order.billNumber,
+                    customerName = order.customerName,
+                    customerMobile = order.customerMobile,
+                    returnDate = order.returnDate,
+                    isOverdue = order.returnDate < todayStart,
+                    isDueToday = order.returnDate in todayStart until todayEnd,
+                    pendingItems = pendingItems
+                )
+            }
+
+        // Metrics computed in memory
+        val todayIncome = payments.sumOf { it.amount }
+        val todayPendingPayment = allOrders
+            .filter { it.orderDate in selectedOverviewDate until selectedOverviewEnd && it.orderStatus != OrderStatus.CANCELLED }
+            .sumOf { it.balanceAmount }
+        val todayOrderCount = allOrders.count { it.orderDate in selectedOverviewDate until selectedOverviewEnd }
+        val activeOrderCount = allOrders.count { it.orderStatus in listOf(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.DELIVERED) }
+        val returnedTodayCount = allOrders.count { it.orderStatus == OrderStatus.COMPLETED && it.updatedAt in todayStart until todayEnd }
+        val pendingReturnCount = pendingReturnOrders.count { it.returnDate <= todayEnd }
 
         return DashboardState(
             isLoading = false,
             selectedOverviewDate = selectedOverviewDate,
-            todayIncome = repository.getTotalPaymentReceived(selectedOverviewDate, selectedOverviewEnd),
-            todayPendingPayment = repository.getTotalPendingBalance(selectedOverviewDate, selectedOverviewEnd),
-            todayOrderCount = repository.getOrderCount(selectedOverviewDate, selectedOverviewEnd),
+            todayIncome = todayIncome,
+            todayPendingPayment = todayPendingPayment,
+            todayOrderCount = todayOrderCount,
             itemStocks = itemStocks,
             selectedStockDate = selectedStockDate,
-            activeOrderCount = repository.getActiveOrderCount(),
-            returnedTodayCount = repository.getReturnedTodayCount(todayStart, todayEnd),
-            pendingReturnCount = repository.getPendingReturnCount(todayEnd),
+            activeOrderCount = activeOrderCount,
+            returnedTodayCount = returnedTodayCount,
+            pendingReturnCount = pendingReturnCount,
             alerts = listOf(
                 DashboardAlertInfo(
                     type = DashboardAlertType.OVERDUE_RETURNS,
@@ -237,29 +312,5 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             upcomingDeliveries = upcomingDeliveries,
             pendingReturns = pendingReturns
         )
-    }
-
-    private suspend fun loadStockForDate(date: Long): List<ItemStockInfo> {
-        val stockDetailsList = repository.getStockDetailsForDate(date)
-        val items = repository.getAllItemsList().filter { it.isActive }
-        val detailsMap = stockDetailsList.associateBy { it.itemId }
-
-        return items.map { item ->
-            val details = detailsMap[item.id]
-            val outStock = details?.outQty ?: 0
-            val available = details?.availableQty ?: item.totalStock
-            val risk = details?.riskQty ?: 0
-
-            ItemStockInfo(
-                itemId = item.id,
-                name = item.name,
-                totalStock = item.totalStock,
-                availableStock = available,
-                outStock = outStock,
-                lowStockAlert = item.lowStockAlert,
-                isLowStock = item.lowStockAlert > 0 && available <= item.lowStockAlert,
-                riskStock = risk
-            )
-        }
     }
 }

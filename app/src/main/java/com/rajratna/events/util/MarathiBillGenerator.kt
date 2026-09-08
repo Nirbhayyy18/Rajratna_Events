@@ -43,6 +43,7 @@ object MarathiBillGenerator {
 
     // Totals
     private const val LABEL_TOTAL = "एकूण रक्कम"
+    private const val LABEL_DISCOUNT = "सवलत / सूट"
     private const val LABEL_PAID = "भरलेली रक्कम"
     private const val LABEL_BALANCE = "बाकी रक्कम"
     private const val LABEL_TRANSPORT = "गाडी भाडे"
@@ -169,6 +170,9 @@ object MarathiBillGenerator {
         return buildString {
             appendLine("राजरत्न इव्हेंट्स")
             appendLine("बिल क्र.: #${order.billNumber}")
+            if (order.discountAmount > 0) {
+                appendLine("सवलत: ₹${order.discountAmount.toInt()}")
+            }
             appendLine("एकूण रक्कम: ₹${order.grandTotal.toInt()}")
             appendLine("भरलेली रक्कम: ₹${totalPaid.toInt()}")
             appendLine("बाकी रक्कम: ₹${balance.toInt()}")
@@ -249,6 +253,10 @@ object MarathiBillGenerator {
         // Transport row
         if (order.transportRent > 0) {
             h += 16f + 6f
+        }
+        // Discount row
+        if (order.discountAmount > 0) {
+            h += 16f + 8f
         }
         // Separator
         h += 1f + 10f
@@ -494,6 +502,13 @@ object MarathiBillGenerator {
         // Separator
         canvas.drawLine(MARGIN_LEFT, y, rightX, y, linePaint)
         y += 1f + 10f
+
+        // Discount row (if any)
+        if (order.discountAmount > 0) {
+            canvas.drawText(LABEL_DISCOUNT, MARGIN_LEFT, y + 12f, totalLabelPaint)
+            canvas.drawText("-₹${String.format("%,d", order.discountAmount.toInt())}", rightX, y + 12f, totalValuePaint)
+            y += 16f + 8f
+        }
 
         // Total
         canvas.drawText(LABEL_TOTAL, MARGIN_LEFT, y + 12f, totalLabelPaint)

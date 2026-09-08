@@ -231,7 +231,8 @@ fun NewOrderScreen(
 
                             ItemQuantityRow(
                                 name = entry.item.name,
-                                rate = entry.item.ratePerDay,
+                                rate = entry.effectiveRate,
+                                defaultRate = entry.item.ratePerDay,
                                 quantity = entry.quantity,
                                 rentalDays = state.rentalDays,
                                 deliveryDate = state.deliveryDate,
@@ -240,6 +241,7 @@ fun NewOrderScreen(
                                 riskStock = risk,
                                 stockError = state.stockErrors[entry.item.id],
                                 onQuantityChange = { viewModel.updateItemQuantity(entry.item.id, it) },
+                                onRateChange = { viewModel.updateItemRate(entry.item.id, it) },
                                 onCustomerOwnedChange = { viewModel.updateItemCustomerOwned(entry.item.id, it) }
                             )
                             if (entry != state.itemEntries.last()) {
@@ -266,6 +268,27 @@ fun NewOrderScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = state.discountAmount,
+                            onValueChange = { viewModel.updateDiscountAmount(it) },
+                            label = { Text("Discount (₹) / सवलत") },
+                            placeholder = { Text("e.g. 30 (Round off)") },
+                            leadingIcon = { Icon(Icons.Default.LocalOffer, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        val discountVal = state.discountAmount.toDoubleOrNull() ?: 0.0
+                        if (discountVal > 0) {
+                            Spacer(Modifier.height(6.dp))
+                            AmountRow(
+                                label = "Discount Applied",
+                                amount = -discountVal,
+                                color = StatusCompleted
+                            )
+                        }
                         Spacer(Modifier.height(8.dp))
                         HorizontalDivider()
                         Spacer(Modifier.height(8.dp))
@@ -415,6 +438,7 @@ private fun SectionCard(
 private fun ItemQuantityRow(
     name: String,
     rate: Double,
+    defaultRate: Double = rate,
     quantity: Int,
     rentalDays: Int,
     deliveryDate: Long,
@@ -423,9 +447,12 @@ private fun ItemQuantityRow(
     riskStock: Int = 0,
     stockError: String? = null,
     onQuantityChange: (Int) -> Unit,
+    onRateChange: (Double) -> Unit = {},
     onCustomerOwnedChange: (Boolean) -> Unit
 ) {
     var quantityText by remember { mutableStateOf(quantity.toString()) }
+    var isEditingRate by remember { mutableStateOf(false) }
+    var rateInput by remember(rate) { mutableStateOf(rate.toInt().toString()) }
 
     LaunchedEffect(quantity) {
         val displayedQuantity = quantityText.toIntOrNull()
@@ -447,11 +474,76 @@ private fun ItemQuantityRow(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Medium
                 )
-                Text(
-                    text = "₹${rate.toInt()} / day",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    Text(
+                        text = "Rate: ₹",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (isEditingRate) {
+                        OutlinedTextField(
+                            value = rateInput,
+                            onValueChange = { input ->
+                                if (input.all { it.isDigit() }) {
+                                    rateInput = input
+                                    val newRate = input.toDoubleOrNull()
+                                    if (newRate != null && newRate > 0) {
+                                        onRateChange(newRate)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.width(68.dp).height(44.dp),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        IconButton(
+                            onClick = { isEditingRate = false },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = "Done",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else {
+                        Surface(
+                            onClick = { isEditingRate = true },
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = "${rate.toInt()}",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (rate != defaultRate) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit rate",
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Text(
+                            text = "/ day",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 if (!isCustomerOwned && availableForDates != null) {
                     Text(
                         text = "Available for selected dates: $availableForDates",

@@ -35,20 +35,22 @@ fun QuickJarBottomSheet(
     jarStats: CustomerJarStats,
     jarRate: Double,
     availableStock: Int,
-    onSave: (quantity: Int, isCustomerOwned: Boolean, paidAmount: Double, deliveryDate: Long) -> Unit,
+    onSave: (quantity: Int, isCustomerOwned: Boolean, paidAmount: Double, deliveryDate: Long, customRate: Double?) -> Unit,
     onDismiss: () -> Unit
 ) {
     var quantity by remember { mutableIntStateOf(0) }
     var customQuantityText by remember { mutableStateOf("") }
     var isCustomQuantity by remember { mutableStateOf(false) }
     var isCustomerOwned by remember { mutableStateOf(false) }
+    var rateText by remember(jarRate) { mutableStateOf(jarRate.toInt().toString()) }
     var paidOption by remember { mutableStateOf("zero") } // "zero", "full", "custom"
     var customPaidText by remember { mutableStateOf("") }
     var deliveryDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showConfirmation by remember { mutableStateOf(false) }
 
+    val effectiveRate = rateText.toDoubleOrNull() ?: jarRate
     val effectiveQuantity = if (isCustomQuantity) (customQuantityText.toIntOrNull() ?: 0) else quantity
-    val totalAmount = effectiveQuantity * jarRate
+    val totalAmount = effectiveQuantity * effectiveRate
     val paidAmount = when (paidOption) {
         "full" -> totalAmount
         "custom" -> customPaidText.toDoubleOrNull() ?: 0.0
@@ -148,17 +150,47 @@ fun QuickJarBottomSheet(
             }
 
             // Rate & total
-            if (effectiveQuantity > 0) {
-                Card(
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = rateText,
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() }) {
+                            rateText = input
+                        }
+                    },
+                    label = { Text("Rate / Jar (₹)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    prefix = { Text("₹") }
+                )
+                if (effectiveQuantity > 0) {
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                        modifier = Modifier.weight(1.2f)
                     ) {
-                        Text("₹${jarRate.toInt()} × $effectiveQuantity", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text("= ${totalAmount.toRupee()}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Column(
+                            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "₹${effectiveRate.toInt()} × $effectiveQuantity jars",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                totalAmount.toRupee(),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
@@ -238,7 +270,7 @@ fun QuickJarBottomSheet(
             paidAmount = paidAmount,
             onConfirm = {
                 showConfirmation = false
-                onSave(effectiveQuantity, isCustomerOwned, paidAmount, deliveryDate)
+                onSave(effectiveQuantity, isCustomerOwned, paidAmount, deliveryDate, if (effectiveRate != jarRate) effectiveRate else null)
             },
             onDismiss = { showConfirmation = false }
         )

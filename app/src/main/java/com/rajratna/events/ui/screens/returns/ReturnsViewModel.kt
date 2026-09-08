@@ -7,6 +7,7 @@ import com.rajratna.events.RajratnaApp
 import com.rajratna.events.data.entity.Order
 import com.rajratna.events.data.entity.OrderItem
 import com.rajratna.events.util.DateUtils
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -85,10 +86,19 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
             val todayStart = DateUtils.startOfToday()
             val todayEnd = DateUtils.endOfToday()
 
+            val pendingDeferred = async { repository.getOrdersWithPendingReturns() }
+            val returnedDeferred = async { repository.getReturnedOrders() }
+            val itemsDeferred = async { repository.getAllOrderItemsList() }
+
+            val pendingOrders = pendingDeferred.await()
+            val returnedOrders = returnedDeferred.await()
+            val allItems = itemsDeferred.await()
+
+            val itemsByOrderId = allItems.groupBy { it.orderId }
+
             // Load pending returns
-            val pendingOrders = repository.getOrdersWithPendingReturns()
             val pendingReturnOrders = pendingOrders.map { order ->
-                val items = repository.getOrderItemsList(order.id).filter { !it.isCustomerOwned }
+                val items = itemsByOrderId[order.id].orEmpty().filter { !it.isCustomerOwned }
                 PendingReturnOrder(
                     order = order,
                     items = items,
@@ -99,9 +109,8 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
             }
 
             // Load returned orders
-            val returnedOrders = repository.getReturnedOrders()
             val returnedOrderModels = returnedOrders.map { order ->
-                val items = repository.getOrderItemsList(order.id).filter { !it.isCustomerOwned }
+                val items = itemsByOrderId[order.id].orEmpty().filter { !it.isCustomerOwned }
                 val fullyReturned = items.all { it.quantity <= (it.returnedQuantity + it.damagedQuantity) }
                 ReturnedOrder(
                     order = order,

@@ -14,8 +14,12 @@ import kotlinx.coroutines.launch
 data class ItemEntry(
     val item: Item,
     val quantity: Int = 0,
+    val customRate: Double? = null,
     val isCustomerOwned: Boolean = false
-)
+) {
+    val effectiveRate: Double
+        get() = customRate ?: item.ratePerDay
+}
 
 data class NewOrderState(
     val isLoading: Boolean = false,
@@ -37,6 +41,7 @@ data class NewOrderState(
     // Amounts
     val itemsTotal: Double = 0.0,
     val transportRent: String = "",
+    val discountAmount: String = "",
     val grandTotal: Double = 0.0,
     val advancePaid: String = "",
     val balanceAmount: Double = 0.0,
@@ -91,6 +96,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                     ItemEntry(
                         item = item,
                         quantity = savedItem?.quantity ?: 0,
+                        customRate = savedItem?.ratePerDay,
                         isCustomerOwned = savedItem?.isCustomerOwned ?: false
                     )
                 }
@@ -100,6 +106,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                     ItemEntry(
                         item = Item(id = oi.itemId, name = oi.itemName, ratePerDay = oi.ratePerDay),
                         quantity = oi.quantity,
+                        customRate = oi.ratePerDay,
                         isCustomerOwned = oi.isCustomerOwned
                     )
                 }
@@ -118,6 +125,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                     notes = order.notes,
                     itemEntries = entries + extraEntries,
                     transportRent = if (order.transportRent > 0) order.transportRent.toInt().toString() else "",
+                    discountAmount = if (order.discountAmount > 0) order.discountAmount.toInt().toString() else "",
                     advancePaid = if (order.advancePaid > 0) order.advancePaid.toInt().toString() else ""
                 )
                 recalculate()
@@ -174,8 +182,21 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         validateStockLocally()
     }
 
+    fun updateItemRate(itemId: String, rate: Double?) {
+        val entries = _state.value.itemEntries.map {
+            if (it.item.id == itemId) it.copy(customRate = rate) else it
+        }
+        _state.value = _state.value.copy(itemEntries = entries)
+        recalculate()
+    }
+
     fun updateTransportRent(rent: String) {
         _state.value = _state.value.copy(transportRent = rent)
+        recalculate()
+    }
+
+    fun updateDiscountAmount(discount: String) {
+        _state.value = _state.value.copy(discountAmount = discount)
         recalculate()
     }
 
@@ -196,10 +217,11 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     private fun recalculate() {
         val s = _state.value
         val itemsTotal = s.itemEntries.sumOf {
-            it.quantity * it.item.ratePerDay * s.rentalDays
+            it.quantity * it.effectiveRate * s.rentalDays
         }
         val transport = s.transportRent.toDoubleOrNull() ?: 0.0
-        val grandTotal = itemsTotal + transport
+        val discount = s.discountAmount.toDoubleOrNull() ?: 0.0
+        val grandTotal = maxOf(0.0, itemsTotal + transport - discount)
         val advance = s.advancePaid.toDoubleOrNull() ?: 0.0
         val balance = grandTotal - advance
 
@@ -284,6 +306,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
             _state.value = s.copy(isSaving = true, errorMessage = null)
 
             val transport = s.transportRent.toDoubleOrNull() ?: 0.0
+            val discount = s.discountAmount.toDoubleOrNull() ?: 0.0
             val advance = s.advancePaid.toDoubleOrNull() ?: 0.0
             val paid = advance
             val balance = s.grandTotal - paid
@@ -319,6 +342,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                 notes = s.notes,
                 itemsTotal = s.itemsTotal,
                 transportRent = transport,
+                discountAmount = discount,
                 grandTotal = s.grandTotal,
                 advancePaid = advance,
                 balanceAmount = balance,
@@ -334,9 +358,9 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                         itemId = entry.item.id,
                         itemName = entry.item.name,
                         quantity = entry.quantity,
-                        ratePerDay = entry.item.ratePerDay,
+                        ratePerDay = entry.effectiveRate,
                         rentalDays = s.rentalDays,
-                        totalAmount = entry.quantity * entry.item.ratePerDay * s.rentalDays,
+                        totalAmount = entry.quantity * entry.effectiveRate * s.rentalDays,
                         isCustomerOwned = entry.isCustomerOwned
                     )
                 }

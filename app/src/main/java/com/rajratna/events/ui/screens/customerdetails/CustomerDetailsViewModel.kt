@@ -80,11 +80,11 @@ class CustomerDetailsViewModel(application: Application) : AndroidViewModel(appl
         _state.value = _state.value.copy(showQuickJar = false)
     }
 
-    fun saveQuickJarEntry(quantity: Int, isCustomerOwned: Boolean, paidAmount: Double, deliveryDate: Long) {
+    fun saveQuickJarEntry(quantity: Int, isCustomerOwned: Boolean, paidAmount: Double, deliveryDate: Long, customRate: Double? = null) {
         val customer = _state.value.customer ?: return
         viewModelScope.launch {
             val waterJar = repository.getWaterJarItem() ?: return@launch
-            repository.saveQuickJarEntry(customer, quantity, isCustomerOwned, paidAmount, deliveryDate, waterJar)
+            repository.saveQuickJarEntry(customer, quantity, isCustomerOwned, paidAmount, deliveryDate, waterJar, customRate)
             _state.value = _state.value.copy(showQuickJar = false, actionMessage = "Jar entry saved!")
             loadCustomer(customer.id)
         }

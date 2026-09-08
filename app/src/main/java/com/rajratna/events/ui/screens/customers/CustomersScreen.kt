@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -35,6 +37,7 @@ fun CustomersScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var showAddCustomerDialog by remember { mutableStateOf(false) }
 
     // Show action messages
     LaunchedEffect(state.actionMessage) {
@@ -49,6 +52,15 @@ fun CustomersScreen(
             TopAppBar(
                 title = { Text("Customers", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { showAddCustomerDialog = true },
+                icon = { Icon(Icons.Default.PersonAdd, contentDescription = "Add Customer") },
+                text = { Text("Add Customer") },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             )
         }
     ) { padding ->
@@ -92,8 +104,8 @@ fun CustomersScreen(
             jarStats = state.selectedCustomerJarStats!!,
             jarRate = state.waterJarRate,
             availableStock = state.availableJarStock,
-            onSave = { quantity, isCustomerOwned, paidAmount, deliveryDate ->
-                viewModel.saveQuickJarEntry(quantity, isCustomerOwned, paidAmount, deliveryDate)
+            onSave = { quantity, isCustomerOwned, paidAmount, deliveryDate, customRate ->
+                viewModel.saveQuickJarEntry(quantity, isCustomerOwned, paidAmount, deliveryDate, customRate)
             },
             onDismiss = { viewModel.dismissQuickJar() }
         )
@@ -118,6 +130,21 @@ fun CustomersScreen(
                 viewModel.saveLumpSumPayment(amount, method)
             },
             onDismiss = { viewModel.dismissRecordPayment() }
+        )
+    }
+
+    if (showAddCustomerDialog) {
+        AddCustomerDialog(
+            onDismiss = { showAddCustomerDialog = false },
+            onConfirm = { name, mobile, address ->
+                viewModel.addCustomer(
+                    name = name,
+                    mobileNumber = mobile,
+                    address = address,
+                    onSuccess = { showAddCustomerDialog = false },
+                    onError = { error -> Toast.makeText(context, error, Toast.LENGTH_SHORT).show() }
+                )
+            }
         )
     }
 }
@@ -325,4 +352,112 @@ private fun JarStatRow(
             fontWeight = FontWeight.SemiBold
         )
     }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ADD CUSTOMER DIALOG
+// ═══════════════════════════════════════════════════════════
+
+@Composable
+private fun AddCustomerDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, mobileNumber: String, address: String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var mobile by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var mobileError by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.PersonAdd, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text("Add New Customer", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = {
+                        name = it
+                        if (it.isNotBlank()) nameError = null
+                    },
+                    label = { Text("Customer Name *") },
+                    placeholder = { Text("e.g. Nirbhay Raut") },
+                    singleLine = true,
+                    isError = nameError != null,
+                    supportingText = nameError?.let { { Text(it) } },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = mobile,
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() } && input.length <= 10) {
+                            mobile = input
+                            if (input.length == 10) mobileError = null
+                        }
+                    },
+                    label = { Text("Mobile Number *") },
+                    placeholder = { Text("10-digit mobile number") },
+                    prefix = { Text("+91 ") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    isError = mobileError != null,
+                    supportingText = mobileError?.let { { Text(it) } },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    label = { Text("Address / Village / Note (Optional)") },
+                    placeholder = { Text("e.g. Andrud, Phaltan") },
+                    minLines = 2,
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    var hasError = false
+                    if (name.isBlank()) {
+                        nameError = "Name is required"
+                        hasError = true
+                    }
+                    if (mobile.isBlank() || mobile.length < 10) {
+                        mobileError = "Valid 10-digit mobile number required"
+                        hasError = true
+                    }
+                    if (!hasError) {
+                        onConfirm(name, mobile, address)
+                    }
+                },
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Save Customer")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

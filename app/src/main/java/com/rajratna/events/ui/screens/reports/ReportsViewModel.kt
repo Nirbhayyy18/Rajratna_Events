@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import com.rajratna.events.RajratnaApp
 import com.rajratna.events.data.repository.ItemIncome
 import com.rajratna.events.util.DateUtils
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
@@ -172,22 +173,22 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true)
 
-            val totalIncome = repository.getTotalIncomeByDelivery(start, end)
-            val received = repository.getTotalPaymentReceived(start, end)
-            val pending = repository.getPendingBalanceByDelivery(start, end)
-            val orderCount = repository.getOrderCountByDelivery(start, end)
-            val itemWise = repository.getItemWiseIncome(start, end)
-            val transportRent = repository.getTotalTransportRent(start, end)
+            val totalIncomeDeferred = async { repository.getTotalIncomeByDelivery(start, end) }
+            val receivedDeferred = async { repository.getTotalPaymentReceived(start, end) }
+            val pendingDeferred = async { repository.getPendingBalanceByDelivery(start, end) }
+            val orderCountDeferred = async { repository.getOrderCountByDelivery(start, end) }
+            val itemWiseDeferred = async { repository.getItemWiseIncome(start, end) }
+            val transportRentDeferred = async { repository.getTotalTransportRent(start, end) }
 
             _state.value = _state.value.copy(
                 isLoading = false,
                 report = ReportData(
-                    totalIncome = totalIncome,
-                    receivedAmount = received,
-                    pendingAmount = pending,
-                    totalOrders = orderCount,
-                    transportRent = transportRent,
-                    itemWiseIncome = itemWise
+                    totalIncome = totalIncomeDeferred.await(),
+                    receivedAmount = receivedDeferred.await(),
+                    pendingAmount = pendingDeferred.await(),
+                    totalOrders = orderCountDeferred.await(),
+                    transportRent = transportRentDeferred.await(),
+                    itemWiseIncome = itemWiseDeferred.await()
                 )
             )
         }

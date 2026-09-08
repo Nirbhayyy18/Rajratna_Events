@@ -23,6 +23,7 @@ data class Order(
     val notes: String = "",
     val itemsTotal: Double = 0.0,
     val transportRent: Double = 0.0,
+    val discountAmount: Double = 0.0,
     val grandTotal: Double = 0.0,
     val advancePaid: Double = 0.0,
     val balanceAmount: Double = 0.0,
