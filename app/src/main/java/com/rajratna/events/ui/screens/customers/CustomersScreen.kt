@@ -230,11 +230,13 @@ private fun CustomerJarCard(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            if (cs.customer.mobileNumber.isNotBlank()) cs.customer.mobileNumber else "Walk-in Customer",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (cs.customer.mobileNumber.isNotBlank()) {
+                            Text(
+                                cs.customer.mobileNumber,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -271,12 +273,21 @@ private fun CustomerJarCard(
                         color = Teal40
                     )
                     Spacer(Modifier.height(6.dp))
-                    JarStatRow(
-                        icon = Icons.Default.AccountBalanceWallet,
-                        label = "Pending",
-                        value = jarStats.pendingBalance.toRupee(),
-                        color = if (jarStats.pendingBalance > 0) PaymentUnpaid else StatusCompleted
-                    )
+                    if (jarStats.advanceBalance > 0 && jarStats.pendingBalance <= 0) {
+                        JarStatRow(
+                            icon = Icons.Default.AccountBalanceWallet,
+                            label = "Advance",
+                            value = jarStats.advanceBalance.toRupee(),
+                            color = StatusCompleted
+                        )
+                    } else {
+                        JarStatRow(
+                            icon = Icons.Default.AccountBalanceWallet,
+                            label = "Pending",
+                            value = jarStats.pendingBalance.toRupee(),
+                            color = if (jarStats.pendingBalance > 0) PaymentUnpaid else StatusCompleted
+                        )
+                    }
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     if (jarStats.pendingReturnJars > 0) {
@@ -342,22 +353,35 @@ private fun CustomerJarCard(
                     }
                 }
 
-                // Pay button (only if pending balance > 0)
-                if (jarStats.pendingBalance > 0) {
-                    OutlinedButton(
-                        onClick = onRecordPayment,
-                        modifier = Modifier.height(36.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
-                    ) {
-                        Icon(Icons.Default.Payment, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Pay", style = MaterialTheme.typography.labelMedium)
-                    }
+                // Pay / Advance button
+                OutlinedButton(
+                    onClick = onRecordPayment,
+                    modifier = Modifier.height(36.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
+                ) {
+                    Icon(Icons.Default.Payment, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (jarStats.pendingBalance > 0) "Pay" else "Pay / Advance", style = MaterialTheme.typography.labelMedium)
                 }
 
-                // Paid clear indicator
-                if (jarStats.pendingBalance <= 0 && cs.totalOrders > 0) {
+                // Advance or Paid clear indicator
+                if (jarStats.advanceBalance > 0 && jarStats.pendingBalance <= 0) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = PaymentPaidBg,
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Default.AccountBalanceWallet, null, tint = PaymentPaid, modifier = Modifier.size(14.dp))
+                            Text("Advance: ${jarStats.advanceBalance.toRupee()}", style = MaterialTheme.typography.labelMedium, color = PaymentPaid, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else if (jarStats.pendingBalance <= 0 && cs.totalOrders > 0) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = PaymentPaidBg,
@@ -415,10 +439,7 @@ private fun CustomerFormDialog(
     var name by remember { mutableStateOf(initialCustomer?.name ?: "") }
     var mobile by remember { mutableStateOf(initialCustomer?.mobileNumber ?: "") }
     var address by remember { mutableStateOf(initialCustomer?.address ?: "") }
-    var totalJars by remember {
-        val count = initialCustomer?.totalJars ?: 0
-        mutableStateOf(if (count > 0) count.toString() else "")
-    }
+
     var pendingReturns by remember {
         val count = if (initialPendingReturns > 0) initialPendingReturns else (initialCustomer?.pendingReturnJars ?: 0)
         mutableStateOf(if (count > 0) count.toString() else "")
@@ -497,7 +518,7 @@ private fun CustomerFormDialog(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 Text(
-                    text = "Notebook / Ledger Setup (जुनी वही नोंद)",
+                    text = "Opening Balance (पेंडिंग बाकी)",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
@@ -508,16 +529,6 @@ private fun CustomerFormDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(
-                        value = totalJars,
-                        onValueChange = { if (it.all { c -> c.isDigit() }) totalJars = it },
-                        label = { Text("Total Jars") },
-                        placeholder = { Text("e.g. 50") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    OutlinedTextField(
                         value = pendingReturns,
                         onValueChange = { if (it.all { c -> c.isDigit() }) pendingReturns = it },
                         label = { Text("Pending Jars") },
@@ -527,18 +538,17 @@ private fun CustomerFormDialog(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
                     )
+                    OutlinedTextField(
+                        value = pendingAmount,
+                        onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) pendingAmount = it },
+                        label = { Text("Pending ₹") },
+                        placeholder = { Text("e.g. 250") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
-
-                OutlinedTextField(
-                    value = pendingAmount,
-                    onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) pendingAmount = it },
-                    label = { Text("Pending Balance / बाकी रक्कम (₹)") },
-                    placeholder = { Text("e.g. 250") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
             }
         },
         confirmButton = {
@@ -552,7 +562,7 @@ private fun CustomerFormDialog(
                         mobileError = "Valid 10-digit number or leave blank"
                         return@Button
                     }
-                    val tj = totalJars.toIntOrNull() ?: 0
+                    val tj = initialCustomer?.totalJars ?: 0
                     val pr = pendingReturns.toIntOrNull() ?: 0
                     val pa = pendingAmount.toDoubleOrNull() ?: 0.0
                     onConfirm(name, mobile, address, tj, pr, pa)

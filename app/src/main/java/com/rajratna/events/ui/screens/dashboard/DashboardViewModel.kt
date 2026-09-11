@@ -109,6 +109,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 refreshDashboardSilently()
             }
         }
+        viewModelScope.launch {
+            repository.getAllCustomers().collect {
+                refreshDashboardSilently()
+            }
+        }
     }
 
     private fun refreshDashboardSilently() {
@@ -169,6 +174,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val allOrders = repository.getAllOrdersList()
         val allOrderItems = repository.getAllOrderItemsList()
         val allItems = repository.getAllItemsList().filter { it.isActive }
+        val allCustomers = repository.getAllCustomersList()
+        val customerPendingJars = allCustomers.sumOf { it.pendingReturnJars }
+        val waterJar = repository.getWaterJarItem()
         val payments = repository.getPaymentsInRangeList(selectedOverviewDate, selectedOverviewEnd)
 
         val itemsByOrder = allOrderItems.groupBy { it.orderId }
@@ -180,7 +188,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         val itemStocks = allItems.map { item ->
-            var outQty = 0
+            val isWaterJar = (waterJar != null && item.id == waterJar.id) ||
+                    item.name.equals("Water Jar", ignoreCase = true) ||
+                    item.name.contains("jar", ignoreCase = true)
+            val customerExtra = if (isWaterJar) customerPendingJars else 0
+
+            var outQty = customerExtra
             var riskQty = 0
             if (isStockToday) {
                 for (order in activeOrdersForStock) {
@@ -234,8 +247,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }.sortedBy { it.returnDate }
 
-        val overdueReturnCount = pendingReturnOrders.count { it.returnDate < todayStart }
-        val pendingPaymentsCount = allOrders.count { it.orderStatus != OrderStatus.CANCELLED && it.balanceAmount > 0.0 }
+        val customersWithPendingJars = allCustomers.count { it.pendingReturnJars > 0 }
+        val overdueReturnCount = pendingReturnOrders.count { it.returnDate < todayStart } + customersWithPendingJars
+        val customersWithPendingPayment = allCustomers.count { it.pendingAmount > 0.0 }
+        val pendingPaymentsCount = allOrders.count { it.orderStatus != OrderStatus.CANCELLED && it.balanceAmount > 0.0 } + customersWithPendingPayment
         val lowStockCount = itemStocks.count { it.isLowStock }
         val tomorrowBookings = allOrders.filter {
             it.orderStatus != OrderStatus.CANCELLED &&
@@ -273,7 +288,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }
 
-        val pendingReturns = pendingReturnOrders
+        val pendingReturnsFromOrders = pendingReturnOrders
             .filter { it.returnDate <= todayEnd }
             .take(3)
             .map { order ->
@@ -294,15 +309,47 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }
 
+        val customerPendingReturnPreviews = if (pendingReturnsFromOrders.size < 3) {
+            allCustomers
+                .filter { it.pendingReturnJars > 0 }
+                .take(3 - pendingReturnsFromOrders.size)
+                .map { customer ->
+                    PendingReturnPreview(
+                        orderId = "",
+                        billNumber = 0,
+                        customerName = customer.name,
+                        customerMobile = customer.mobileNumber,
+                        returnDate = todayStart,
+                        isOverdue = true,
+                        isDueToday = true,
+                        pendingItems = listOf(PendingItemInfo("Water Jar", customer.pendingReturnJars))
+                    )
+                }
+        } else emptyList()
+
+        val pendingReturns = pendingReturnsFromOrders + customerPendingReturnPreviews
+
         // Metrics computed in memory
         val todayIncome = payments.sumOf { it.amount }
-        val todayPendingPayment = allOrders
-            .filter { it.orderDate in selectedOverviewDate until selectedOverviewEnd && it.orderStatus != OrderStatus.CANCELLED }
-            .sumOf { it.balanceAmount }
-        val todayOrderCount = allOrders.count { it.orderDate in selectedOverviewDate until selectedOverviewEnd }
+        val dayOrders = allOrders.filter {
+            it.orderStatus != OrderStatus.CANCELLED &&
+            (it.deliveryDate in selectedOverviewDate until selectedOverviewEnd ||
+             it.orderDate in selectedOverviewDate until selectedOverviewEnd)
+        }
+
+        val isOverviewToday = selectedOverviewDate == todayStart
+        val todayPendingPayment = if (isOverviewToday) {
+            val ordersPending = allOrders.filter { it.orderStatus != OrderStatus.CANCELLED }.sumOf { it.balanceAmount }
+            val customersPendingNet = allCustomers.sumOf { maxOf(0.0, it.pendingAmount - it.advanceBalance) }
+            ordersPending + customersPendingNet
+        } else {
+            dayOrders.sumOf { it.balanceAmount }
+        }
+
+        val todayOrderCount = dayOrders.size
         val activeOrderCount = allOrders.count { it.orderStatus in listOf(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.DELIVERED) }
         val returnedTodayCount = allOrders.count { it.orderStatus == OrderStatus.COMPLETED && it.updatedAt in todayStart until todayEnd }
-        val pendingReturnCount = pendingReturnOrders.count { it.returnDate <= todayEnd }
+        val pendingReturnCount = pendingReturnOrders.count { it.returnDate <= todayEnd } + customersWithPendingJars
 
         return DashboardState(
             isLoading = false,
@@ -319,12 +366,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 DashboardAlertInfo(
                     type = DashboardAlertType.OVERDUE_RETURNS,
                     count = overdueReturnCount,
-                    description = if (overdueReturnCount == 0) "No overdue returns" else "$overdueReturnCount orders overdue"
+                    description = if (overdueReturnCount == 0) "No overdue returns" else "$overdueReturnCount returns pending"
                 ),
                 DashboardAlertInfo(
                     type = DashboardAlertType.PENDING_PAYMENTS,
                     count = pendingPaymentsCount,
-                    description = if (pendingPaymentsCount == 0) "No pending payments" else "$pendingPaymentsCount orders pending"
+                    description = if (pendingPaymentsCount == 0) "No pending payments" else "$pendingPaymentsCount dues pending"
                 ),
                 DashboardAlertInfo(
                     type = DashboardAlertType.LOW_STOCK,

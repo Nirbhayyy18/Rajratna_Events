@@ -8,6 +8,7 @@ import com.rajratna.events.data.entity.*
 import com.rajratna.events.data.repository.StockDetails
 import com.rajratna.events.util.DateUtils
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -30,6 +31,9 @@ data class NewOrderState(
     val customerName: String = "",
     val mobileNumber: String = "",
     val address: String = "",
+    val matchedCustomer: Customer? = null,
+    val useAdvanceCredit: Boolean = true,
+    val appliedCreditAmount: Double = 0.0,
     // Dates
     val orderDate: Long = System.currentTimeMillis(),
     val deliveryDate: Long = System.currentTimeMillis(),
@@ -142,12 +146,39 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
 
     // ── Update Functions ────────────────────────────────────
 
+    private var customerLookupJob: Job? = null
+
+    private fun checkCustomerCredit() {
+        customerLookupJob?.cancel()
+        customerLookupJob = viewModelScope.launch {
+            delay(250)
+            val mobile = _state.value.mobileNumber.trim()
+            val name = _state.value.customerName.trim()
+            var matched: Customer? = null
+            if (mobile.length >= 10) {
+                matched = repository.getCustomerByMobile(mobile)
+            }
+            if (matched == null && name.length >= 2) {
+                matched = repository.getCustomerByName(name)
+            }
+            _state.value = _state.value.copy(matchedCustomer = matched)
+            recalculate()
+        }
+    }
+
     fun updateCustomerName(name: String) {
         _state.value = _state.value.copy(customerName = name, errorMessage = null)
+        checkCustomerCredit()
     }
 
     fun updateMobileNumber(mobile: String) {
         _state.value = _state.value.copy(mobileNumber = mobile, errorMessage = null)
+        checkCustomerCredit()
+    }
+
+    fun toggleUseAdvanceCredit(use: Boolean) {
+        _state.value = _state.value.copy(useAdvanceCredit = use)
+        recalculate()
     }
 
     fun updateAddress(address: String) {
@@ -230,11 +261,16 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
         val discount = s.discountAmount.toDoubleOrNull() ?: 0.0
         val grandTotal = maxOf(0.0, itemsTotal + transport - discount)
         val advance = s.advancePaid.toDoubleOrNull() ?: 0.0
-        val balance = grandTotal - advance
+
+        val creditAvailable = if (!s.isEditMode && s.useAdvanceCredit) (s.matchedCustomer?.advanceBalance ?: 0.0) else 0.0
+        val appliedCredit = if (creditAvailable > 0) minOf(creditAvailable, maxOf(0.0, grandTotal - advance)) else 0.0
+        val totalPaid = advance + appliedCredit
+        val balance = maxOf(0.0, grandTotal - totalPaid)
 
         _state.value = s.copy(
             itemsTotal = itemsTotal,
             grandTotal = grandTotal,
+            appliedCreditAmount = appliedCredit,
             balanceAmount = balance
         )
     }
@@ -314,14 +350,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
 
             val transport = s.transportRent.toDoubleOrNull() ?: 0.0
             val discount = s.discountAmount.toDoubleOrNull() ?: 0.0
-            val advance = s.advancePaid.toDoubleOrNull() ?: 0.0
-            val paid = advance
-            val balance = s.grandTotal - paid
-            val paymentStatus = when {
-                paid >= s.grandTotal -> PaymentStatusType.PAID
-                paid > 0 -> PaymentStatusType.PARTIALLY_PAID
-                else -> PaymentStatusType.UNPAID
-            }
+            val cashAdvance = s.advancePaid.toDoubleOrNull() ?: 0.0
 
             // Find or create customer
             var customer: Customer? = null
@@ -347,6 +376,31 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                 )
             }
 
+            // Calculate advance credit usage
+            val availableCredit = if (!s.isEditMode && s.useAdvanceCredit) customer.advanceBalance else 0.0
+            val creditUsed = if (availableCredit > 0) minOf(availableCredit, maxOf(0.0, s.grandTotal - cashAdvance)) else 0.0
+
+            var currentCustomerAdvance = customer.advanceBalance - creditUsed
+            val totalPaid = cashAdvance + creditUsed
+
+            // If cash advance exceeds balance, add excess to customer advance balance
+            if (cashAdvance > maxOf(0.0, s.grandTotal - creditUsed)) {
+                val excessCash = cashAdvance - maxOf(0.0, s.grandTotal - creditUsed)
+                currentCustomerAdvance += excessCash
+            }
+
+            if (currentCustomerAdvance != customer.advanceBalance) {
+                repository.updateCustomer(customer.copy(advanceBalance = currentCustomerAdvance))
+            }
+
+            val effectiveAdvancePaid = minOf(totalPaid, s.grandTotal)
+            val balance = maxOf(0.0, s.grandTotal - totalPaid)
+            val paymentStatus = when {
+                totalPaid >= s.grandTotal -> PaymentStatusType.PAID
+                totalPaid > 0 -> PaymentStatusType.PARTIALLY_PAID
+                else -> PaymentStatusType.UNPAID
+            }
+
             val effectiveReturnDate = if (s.isOnlyCustomerJar) s.deliveryDate else s.returnDate
             val effectiveRentalDays = if (s.isOnlyCustomerJar) 1 else s.rentalDays
 
@@ -365,7 +419,7 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                 transportRent = transport,
                 discountAmount = discount,
                 grandTotal = s.grandTotal,
-                advancePaid = advance,
+                advancePaid = effectiveAdvancePaid,
                 balanceAmount = balance,
                 orderStatus = status,
                 paymentStatus = paymentStatus
@@ -394,14 +448,30 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
                 repository.createOrder(order, orderItems)
             }
 
-            // If advance was paid, record as initial payment
-            if (advance > 0 && !s.isEditMode) {
+            // If advance credit was used, record as payment
+            if (creditUsed > 0 && !s.isEditMode) {
                 repository.recordPayment(
                     Payment(
                         orderId = orderId,
-                        customerName = s.customerName,
-                        customerMobile = s.mobileNumber,
-                        amount = advance,
+                        customerName = s.customerName.trim(),
+                        customerMobile = s.mobileNumber.trim(),
+                        amount = creditUsed,
+                        paymentDate = System.currentTimeMillis(),
+                        paymentMethod = "Advance Credit",
+                        notes = "Adjusted from Advance Credit"
+                    )
+                )
+            }
+
+            // If cash advance was paid, record as payment
+            val cashRecordedForOrder = minOf(cashAdvance, maxOf(0.0, s.grandTotal - creditUsed))
+            if (cashRecordedForOrder > 0 && !s.isEditMode) {
+                repository.recordPayment(
+                    Payment(
+                        orderId = orderId,
+                        customerName = s.customerName.trim(),
+                        customerMobile = s.mobileNumber.trim(),
+                        amount = cashRecordedForOrder,
                         paymentDate = System.currentTimeMillis(),
                         paymentMethod = PaymentMethod.CASH,
                         notes = "Advance payment"

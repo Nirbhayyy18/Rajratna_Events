@@ -196,7 +196,8 @@ Balance: ${order.balanceAmount.toInt()} rs
         thisMonthJarAmount: Double,
         paidAmount: Double,
         pendingBalance: Double,
-        pendingReturnJars: Int
+        pendingReturnJars: Int,
+        advanceBalance: Double = 0.0
     ): String {
         val sb = StringBuilder()
         sb.appendLine("Rajratna Events")
@@ -208,6 +209,9 @@ Balance: ${order.balanceAmount.toInt()} rs
         sb.appendLine("Total Amount: ₹${thisMonthJarAmount.toInt()}")
         sb.appendLine("Paid: ₹${paidAmount.toInt()}")
         sb.appendLine("Balance: ₹${pendingBalance.toInt()}")
+        if (advanceBalance > 0) {
+            sb.appendLine("Advance Credit: ₹${advanceBalance.toInt()}")
+        }
         if (pendingReturnJars > 0) {
             sb.appendLine("Pending Return: $pendingReturnJars jars")
         }

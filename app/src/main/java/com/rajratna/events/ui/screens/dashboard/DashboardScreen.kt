@@ -31,6 +31,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rajratna.events.ui.components.IconPod
@@ -45,6 +47,7 @@ import java.util.Calendar
 fun DashboardScreen(
     onNavigateToNewOrder: () -> Unit,
     onNavigateToOrders: () -> Unit,
+    onNavigateToCustomers: () -> Unit = {},
     onNavigateToItems: () -> Unit,
     onNavigateToBackup: () -> Unit,
     onNavigateToReturns: () -> Unit,
@@ -57,6 +60,11 @@ fun DashboardScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // Auto-refresh on screen resume whenever user navigates back to Dashboard
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.loadDashboard()
+    }
 
     // Entry animation trigger
     var visible by remember { mutableStateOf(false) }
@@ -85,6 +93,9 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToCustomers) {
+                        Icon(Icons.Default.People, contentDescription = "Customers")
+                    }
                     ThemeToggleButton(
                         currentMode  = currentTheme,
                         onCycleTheme = onCycleTheme

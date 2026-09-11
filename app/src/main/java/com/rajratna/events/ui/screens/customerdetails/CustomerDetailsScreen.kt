@@ -42,6 +42,8 @@ fun CustomerDetailsScreen(
     val activeOrders = orders.filter { it.orderStatus != "Cancelled" }
     val jarStats = state.jarStats
 
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
     // Show action messages
     LaunchedEffect(state.actionMessage) {
         state.actionMessage?.let {
@@ -54,7 +56,18 @@ fun CustomerDetailsScreen(
         topBar = {
             TopAppBar(
                 title = { Text(customer?.name ?: "Customer", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                actions = {
+                    if (customer != null) {
+                        IconButton(onClick = { showDeleteConfirmation = true }) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete Customer",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -182,6 +195,24 @@ fun CustomerDetailsScreen(
                                 JarSummaryItem("Amount", jarStats.thisMonthJarAmount.toRupee(), Teal40)
                                 JarSummaryItem("Paid", jarStats.thisMonthPaid.toRupee(), StatusCompleted)
                                 JarSummaryItem("Balance", jarStats.pendingBalance.toRupee(), if (jarStats.pendingBalance > 0) PaymentUnpaid else StatusCompleted)
+                            }
+
+                            if (jarStats.advanceBalance > 0) {
+                                Spacer(Modifier.height(8.dp))
+                                HorizontalDivider(color = Teal40.copy(alpha = 0.2f))
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.AccountBalanceWallet, null, tint = StatusCompleted, modifier = Modifier.size(18.dp))
+                                    Text(
+                                        "Advance Credit: ${jarStats.advanceBalance.toRupee()}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = StatusCompleted
+                                    )
+                                }
                             }
 
                             if (jarStats.pendingReturnJars > 0) {
@@ -325,26 +356,24 @@ fun CustomerDetailsScreen(
                             }
                         }
 
-                        // Payment
-                        if (jarStats.pendingBalance > 0) {
-                            OutlinedButton(
-                                onClick = { viewModel.openRecordPayment() },
-                                modifier = buttonModifier,
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 6.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Payment,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(Modifier.width(2.dp))
-                                Text(
-                                    "Pay",
-                                    fontSize = 13.sp,
-                                    maxLines = 1
-                                )
-                            }
+                        // Payment / Advance
+                        OutlinedButton(
+                            onClick = { viewModel.openRecordPayment() },
+                            modifier = buttonModifier,
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Payment,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                if (jarStats.pendingBalance > 0) "Pay" else "Pay / Advance",
+                                fontSize = 13.sp,
+                                maxLines = 1
+                            )
                         }
 
                         // WhatsApp
@@ -356,7 +385,8 @@ fun CustomerDetailsScreen(
                                     jarStats.thisMonthJarAmount,
                                     jarStats.totalPaid,
                                     jarStats.pendingBalance,
-                                    jarStats.pendingReturnJars
+                                    jarStats.pendingReturnJars,
+                                    jarStats.advanceBalance
                                 )
                                 WhatsAppUtils.shareOnWhatsApp(
                                     context,
@@ -463,6 +493,38 @@ fun CustomerDetailsScreen(
                 viewModel.saveLumpSumPayment(amount, method)
             },
             onDismiss = { viewModel.dismissRecordPayment() }
+        )
+    }
+
+    if (showDeleteConfirmation && customer != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Delete Customer?") },
+            text = { Text("Are you sure you want to delete ${customer.name}? This customer will be removed from your customer list.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmation = false
+                        viewModel.deleteCustomer(
+                            onSuccess = {
+                                Toast.makeText(context, "Customer deleted", Toast.LENGTH_SHORT).show()
+                                onNavigateBack()
+                            },
+                            onError = { err ->
+                                Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 }

@@ -540,15 +540,20 @@ fun RecordPaymentBottomSheet(
 
     // Excess payment confirmation
     if (showExcessWarning) {
+        val extraCredit = effectiveAmount - pendingAmount
         AlertDialog(
             onDismissRequest = { showExcessWarning = false },
-            title = { Text("Excess Payment") },
-            text = { Text("Payment amount (${effectiveAmount.toRupee()}) exceeds pending balance (${pendingAmount.toRupee()}). Are you sure?") },
+            title = { Text("Advance Credit (आगाऊ जमा)") },
+            text = {
+                Text(
+                    "Payment amount (${effectiveAmount.toRupee()}) exceeds pending balance (${pendingAmount.toRupee()}).\n\nThe extra ${extraCredit.toRupee()} will be saved as Advance Credit (जमा) and adjusted in future orders."
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     showExcessWarning = false
                     onSave(effectiveAmount, paymentMethod)
-                }) { Text("Save Anyway") }
+                }) { Text("Confirm & Save") }
             },
             dismissButton = {
                 TextButton(onClick = { showExcessWarning = false }) { Text("Cancel") }

@@ -1,6 +1,7 @@
 package com.rajratna.events.ui.screens.neworder
 
 import android.app.DatePickerDialog
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -333,10 +334,56 @@ fun NewOrderScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(Modifier.height(8.dp))
+
+                        // Advance Credit from customer if available
+                        val customerAdvance = state.matchedCustomer?.advanceBalance ?: 0.0
+                        if (customerAdvance > 0 && !state.isEditMode) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = StatusConfirmedBg.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, StatusConfirmed.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            "Advance Credit: ${customerAdvance.toRupee()}",
+                                            fontWeight = FontWeight.Bold,
+                                            color = StatusConfirmed,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Text(
+                                            if (state.useAdvanceCredit) "Deducting ${state.appliedCreditAmount.toRupee()} from credit" else "Advance credit not applied",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Switch(
+                                        checked = state.useAdvanceCredit,
+                                        onCheckedChange = { viewModel.toggleUseAdvanceCredit(it) }
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                        }
+
+                        if (state.appliedCreditAmount > 0) {
+                            AmountRow(
+                                label = "From Advance Credit",
+                                amount = -state.appliedCreditAmount,
+                                color = StatusConfirmed
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+
                         OutlinedTextField(
                             value = state.advancePaid,
                             onValueChange = { viewModel.updateAdvancePaid(it) },
-                            label = { Text("Advance Paid (₹)") },
+                            label = { Text("Cash Advance Paid (₹)") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(),

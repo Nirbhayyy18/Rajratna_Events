@@ -52,6 +52,7 @@ fun AppNavGraph(
             DashboardScreen(
                 onNavigateToNewOrder    = { navController.navigate(Screen.NewOrder.route) },
                 onNavigateToOrders      = { navController.navigate(Screen.OrdersList.route) },
+                onNavigateToCustomers   = { navController.navigate(Screen.Customers.route) },
                 onNavigateToItems       = { navController.navigate(Screen.ItemsRates.route) },
                 onNavigateToBackup      = { navController.navigate(Screen.Backup.route) },
                 onNavigateToPayments    = { navController.navigate(Screen.Payments.route) },

@@ -63,7 +63,8 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
                     val activeOrders = custOrders.filter { it.orderStatus != OrderStatus.CANCELLED }
                     val totalOrders = custOrders.size
                     val totalAmount = activeOrders.sumOf { it.grandTotal }
-                    val pendingBalance = customer.pendingAmount + activeOrders.sumOf { it.balanceAmount }
+                    val grossPending = customer.pendingAmount + activeOrders.sumOf { it.balanceAmount }
+                    val pendingBalance = maxOf(0.0, grossPending - customer.advanceBalance)
                     val totalPaid = totalAmount - pendingBalance
 
                     val monthOrders = activeOrders.filter { it.deliveryDate in monthStart until monthEnd }
@@ -114,7 +115,8 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
                         pendingReturnJars = pendingReturnJars,
                         lastJarQuantity = lastJarQuantity,
                         lastJarDate = lastJarDate,
-                        lastJarIsCustomerOwned = lastJarIsCustomerOwned
+                        lastJarIsCustomerOwned = lastJarIsCustomerOwned,
+                        advanceBalance = customer.advanceBalance
                     )
 
                     CustomerWithStats(customer, totalOrders, totalAmount, totalPaid, pendingBalance, jarStats)
@@ -202,7 +204,6 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
         val customer = _state.value.selectedCustomer ?: return
         viewModelScope.launch {
             val pendingReturns = repository.getCustomerPendingJarReturns(customer.id)
-            if (pendingReturns.isEmpty()) return@launch
 
             // Distribute returns across pending order items (oldest first)
             var remainingReturn = returnedNow
@@ -223,6 +224,13 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 remainingReturn -= returnForThis
                 remainingDamaged -= damagedForThis
+            }
+
+            // Deduct remaining from baseline pendingReturnJars on Customer entity
+            val totalProcessedFromBaseline = remainingReturn + remainingDamaged
+            if (totalProcessedFromBaseline > 0 && customer.pendingReturnJars > 0) {
+                val newBaseline = maxOf(0, customer.pendingReturnJars - totalProcessedFromBaseline)
+                repository.updateCustomer(customer.copy(pendingReturnJars = newBaseline))
             }
 
             _state.value = _state.value.copy(showReturnJar = false, selectedCustomer = null, selectedCustomerJarStats = null, actionMessage = "Jar return recorded for ${customer.name}")
@@ -250,8 +258,35 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
     fun saveLumpSumPayment(amount: Double, paymentMethod: String) {
         val customer = _state.value.selectedCustomer ?: return
         viewModelScope.launch {
-            repository.recordLumpSumPayment(customer, amount, paymentMethod)
-            _state.value = _state.value.copy(showRecordPayment = false, selectedCustomer = null, selectedCustomerJarStats = null, actionMessage = "Payment of ₹${amount.toInt()} recorded for ${customer.name}")
+            var remaining = amount
+
+            // First, pay off order-based balances
+            remaining = repository.recordLumpSumPaymentAndGetRemaining(customer, remaining, paymentMethod)
+
+            var currentCustomer = repository.getCustomerById(customer.id) ?: customer
+
+            // Then deduct remaining from baseline pendingAmount on Customer entity
+            if (remaining > 0 && currentCustomer.pendingAmount > 0) {
+                val deductFromBaseline = minOf(remaining, currentCustomer.pendingAmount)
+                val newBaseline = maxOf(0.0, currentCustomer.pendingAmount - deductFromBaseline)
+                currentCustomer = currentCustomer.copy(pendingAmount = newBaseline)
+                repository.updateCustomer(currentCustomer)
+                remaining -= deductFromBaseline
+            }
+
+            // Any remaining excess payment is added to customer's advanceBalance
+            if (remaining > 0) {
+                val newAdvance = currentCustomer.advanceBalance + remaining
+                repository.updateCustomer(currentCustomer.copy(advanceBalance = newAdvance))
+            }
+
+            val advanceMsg = if (remaining > 0) " (₹${remaining.toInt()} added to Advance Credit)" else ""
+            _state.value = _state.value.copy(
+                showRecordPayment = false,
+                selectedCustomer = null,
+                selectedCustomerJarStats = null,
+                actionMessage = "Payment of ₹${amount.toInt()} recorded for ${customer.name}$advanceMsg"
+            )
             loadCustomers()
         }
     }
@@ -347,6 +382,23 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.message ?: "Failed to update customer")
+            }
+        }
+    }
+
+    fun deleteCustomer(
+        customer: Customer,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.deleteCustomer(customer.id)
+                _state.value = _state.value.copy(actionMessage = "Customer ${customer.name} deleted")
+                loadCustomers()
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.localizedMessage ?: "Failed to delete customer")
             }
         }
     }

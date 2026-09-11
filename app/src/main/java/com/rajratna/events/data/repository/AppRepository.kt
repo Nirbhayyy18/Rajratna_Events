@@ -133,6 +133,15 @@ class AppRepository(
         awaitClose { registration.remove() }
     }
 
+    suspend fun getAllCustomersList(): List<Customer> {
+        return try {
+            val snapshot = customersCol.get().await()
+            snapshot.toObjects(Customer::class.java).filter { !it.isDeleted }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     suspend fun getCustomerById(id: String): Customer? {
         return try {
             val doc = customersCol.document(id).get().await()
@@ -470,7 +479,15 @@ class AppRepository(
             .whereEqualTo("deleted", false)
             .get().await()
         val orders = snapshot.toObjects(Order::class.java)
-        return orders.filter { it.orderStatus != OrderStatus.CANCELLED }.sumOf { it.balanceAmount }
+        val ordersPending = orders.filter { it.orderStatus != OrderStatus.CANCELLED }.sumOf { it.balanceAmount }
+
+        val custSnapshot = customersCol
+            .whereEqualTo("deleted", false)
+            .get().await()
+        val customers = custSnapshot.toObjects(Customer::class.java)
+        val customersPendingNet = customers.sumOf { it.pendingAmount - it.advanceBalance }
+
+        return maxOf(0.0, ordersPending + customersPendingNet)
     }
 
     suspend fun getActiveOrderCount(): Int {
@@ -574,18 +591,30 @@ class AppRepository(
             it.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED)
         }.map { it.id }.toSet()
 
-        if (activeOrderIds.isEmpty()) return emptyList()
+        val allCustomers = getAllCustomersList()
+        val customerPendingJars = allCustomers.sumOf { it.pendingReturnJars }
+        val waterJar = getWaterJarItem()
 
-        val allOrderItems = getAllOrderItemsList().filter { it.orderId in activeOrderIds }
-        return allOrderItems
+        val allOrderItems = if (activeOrderIds.isNotEmpty()) {
+            getAllOrderItemsList().filter { it.orderId in activeOrderIds }
+        } else emptyList()
+
+        val orderRentedMap = allOrderItems
             .filter { !it.isCustomerOwned && (it.quantity - it.returnedQuantity - it.damagedQuantity) > 0 }
             .groupBy { it.itemId }
-            .map { (itemId, items) ->
-                RentedQuantity(
-                    itemId = itemId,
-                    totalRented = items.sumOf { it.quantity - it.returnedQuantity - it.damagedQuantity }
-                )
-            }
+            .mapValues { (_, items) -> items.sumOf { it.quantity - it.returnedQuantity - it.damagedQuantity } }
+            .toMutableMap()
+
+        if (waterJar != null && customerPendingJars > 0) {
+            orderRentedMap[waterJar.id] = (orderRentedMap[waterJar.id] ?: 0) + customerPendingJars
+        }
+
+        return orderRentedMap.map { (itemId, totalRented) ->
+            RentedQuantity(
+                itemId = itemId,
+                totalRented = totalRented
+            )
+        }
     }
 
     // ── Date-Wise Stock ─────────────────────────────────────
@@ -619,12 +648,21 @@ class AppRepository(
         val allOrderItems = getAllOrderItemsList().filter { !it.isCustomerOwned }
         val itemsByOrder = allOrderItems.groupBy { it.orderId }
 
+        val allCustomers = getAllCustomersList()
+        val customerPendingJars = allCustomers.sumOf { it.pendingReturnJars }
+        val waterJar = getWaterJarItem()
+
         val today = DateUtils.startOfToday()
         val isToday = selectedDate == today
 
         return items.map { item ->
+            val isWaterJar = (waterJar != null && item.id == waterJar.id) ||
+                    item.name.equals("Water Jar", ignoreCase = true) ||
+                    item.name.contains("jar", ignoreCase = true)
+            val customerExtra = if (isWaterJar) customerPendingJars else 0
+
             if (isToday) {
-                var physicalOut = 0
+                var physicalOut = customerExtra
                 activeOrders.forEach { order ->
                     val orderDeliveryStart = DateUtils.startOfDay(order.deliveryDate)
                     if (order.id != excludeOrderId && orderDeliveryStart <= today) {
@@ -647,7 +685,7 @@ class AppRepository(
                     riskQty = 0
                 )
             } else {
-                var scheduledOut = 0
+                var scheduledOut = customerExtra
                 var risk = 0
                 activeOrders.forEach { order ->
                     if (order.id != excludeOrderId) {
@@ -694,16 +732,25 @@ class AppRepository(
         val allOrderItems = getAllOrderItemsList().filter { !it.isCustomerOwned }
         val itemsByOrder = allOrderItems.groupBy { it.orderId }
 
+        val allCustomers = getAllCustomersList()
+        val customerPendingJars = allCustomers.sumOf { it.pendingReturnJars }
+        val waterJar = getWaterJarItem()
+
         val today = DateUtils.startOfToday()
 
         return items.associate { item ->
+            val isWaterJar = (waterJar != null && item.id == waterJar.id) ||
+                    item.name.equals("Water Jar", ignoreCase = true) ||
+                    item.name.contains("jar", ignoreCase = true)
+            val customerExtra = if (isWaterJar) customerPendingJars else 0
+
             var minAvailable = Int.MAX_VALUE
             var riskOnDelivery = 0
             var outOnDelivery = 0
 
             days.forEachIndexed { index, day ->
                 val isToday = day == today
-                var outQty = 0
+                var outQty = customerExtra
                 var riskQty = 0
 
                 activeOrders.forEach { order ->
@@ -976,9 +1023,33 @@ class AppRepository(
     ): String {
         val effectiveRate = customRate ?: waterJarItem.ratePerDay
         val totalAmount = quantity * effectiveRate
+
+        val freshCustomer = getCustomerById(customer.id) ?: customer
+        var currentAdvance = freshCustomer.advanceBalance
+
+        // Calculate how much advance credit can be used for this order
+        val balanceNeeded = maxOf(0.0, totalAmount - paidAmount)
+        val creditToUse = if (balanceNeeded > 0 && currentAdvance > 0) {
+            minOf(currentAdvance, balanceNeeded)
+        } else 0.0
+
+        val effectivePaid = paidAmount + creditToUse
+        currentAdvance -= creditToUse
+
+        // If user paid more in cash than totalAmount (excess cash), add to advance credit
+        if (paidAmount > totalAmount) {
+            val excessCash = paidAmount - totalAmount
+            currentAdvance += excessCash
+        }
+
+        // Update customer advance balance if changed
+        if (currentAdvance != freshCustomer.advanceBalance) {
+            updateCustomer(freshCustomer.copy(advanceBalance = currentAdvance))
+        }
+
         val paymentStatus = when {
-            paidAmount >= totalAmount -> PaymentStatusType.PAID
-            paidAmount > 0 -> PaymentStatusType.PARTIALLY_PAID
+            effectivePaid >= totalAmount -> PaymentStatusType.PAID
+            effectivePaid > 0 -> PaymentStatusType.PARTIALLY_PAID
             else -> PaymentStatusType.UNPAID
         }
 
@@ -996,8 +1067,8 @@ class AppRepository(
             transportRent = 0.0,
             discountAmount = 0.0,
             grandTotal = totalAmount,
-            advancePaid = paidAmount,
-            balanceAmount = totalAmount - paidAmount,
+            advancePaid = minOf(effectivePaid, totalAmount),
+            balanceAmount = maxOf(0.0, totalAmount - effectivePaid),
             orderStatus = OrderStatus.DELIVERED,
             paymentStatus = paymentStatus
         )
@@ -1014,14 +1085,30 @@ class AppRepository(
 
         val orderId = createOrder(order, listOf(orderItem))
 
-        // Record payment if paid
-        if (paidAmount > 0) {
+        // Record payment for advance credit used
+        if (creditToUse > 0) {
             recordPayment(
                 Payment(
                     orderId = orderId,
                     customerName = customer.name,
                     customerMobile = customer.mobileNumber,
-                    amount = paidAmount,
+                    amount = creditToUse,
+                    paymentDate = System.currentTimeMillis(),
+                    paymentMethod = "Advance Credit",
+                    notes = "Adjusted from Advance Credit"
+                )
+            )
+        }
+
+        // Record payment for cash paid (capped at totalAmount - creditToUse if excess paid)
+        val cashRecordedForOrder = minOf(paidAmount, maxOf(0.0, totalAmount - creditToUse))
+        if (cashRecordedForOrder > 0) {
+            recordPayment(
+                Payment(
+                    orderId = orderId,
+                    customerName = customer.name,
+                    customerMobile = customer.mobileNumber,
+                    amount = cashRecordedForOrder,
                     paymentDate = System.currentTimeMillis(),
                     paymentMethod = PaymentMethod.CASH,
                     notes = "Quick Jar Entry payment"
@@ -1037,6 +1124,19 @@ class AppRepository(
         amount: Double,
         paymentMethod: String
     ) {
+        recordLumpSumPaymentAndGetRemaining(customer, amount, paymentMethod)
+    }
+
+    /**
+     * Pays off order-based balances (oldest first) and returns any remaining amount
+     * that was not applied to any order. The caller can then deduct this from
+     * the customer's baseline pendingAmount.
+     */
+    suspend fun recordLumpSumPaymentAndGetRemaining(
+        customer: Customer,
+        amount: Double,
+        paymentMethod: String
+    ): Double {
         val customerOrders = getAllOrdersList()
             .filter { it.customerId == customer.id && it.orderStatus != OrderStatus.CANCELLED }
             .filter { it.balanceAmount > 0 }
@@ -1061,6 +1161,8 @@ class AppRepository(
             )
             remaining -= payForThis
         }
+
+        return remaining
     }
 
     suspend fun getCustomerJarStats(customerId: String): CustomerJarStats {
@@ -1130,6 +1232,7 @@ class AppRepository(
 
         // This month paid
         val thisMonthPaid = monthOrders.sumOf { it.grandTotal - it.balanceAmount }
+        val advanceBalance = customer?.advanceBalance ?: 0.0
 
         return CustomerJarStats(
             thisMonthJarCount = thisMonthJarCount,
@@ -1137,6 +1240,7 @@ class AppRepository(
             thisMonthPaid = thisMonthPaid,
             totalPaid = paidAmount,
             pendingBalance = pendingBalance,
+            advanceBalance = advanceBalance,
             pendingReturnJars = pendingReturnJars,
             lastJarQuantity = lastJarQuantity,
             lastJarDate = lastJarDate,
@@ -1279,9 +1383,35 @@ class AppRepository(
     suspend fun getPaymentsInRangeList(start: Long, end: Long): List<Payment> {
         return try {
             val snap = db.collectionGroup("payments").get().await()
-            snap.toObjects(Payment::class.java).filter { it.paymentDate in start until end }
+            val list = snap.toObjects(Payment::class.java).filter { it.paymentDate in start until end }
+            if (list.isNotEmpty()) return list
+
+            // Fallback: check orders created/active in range with payments
+            val orders = getAllOrdersList()
+            orders.filter { it.orderDate in start until end && it.advancePaid > 0 }
+                .map {
+                    Payment(
+                        orderId = it.id,
+                        customerName = it.customerName,
+                        customerMobile = it.customerMobile,
+                        amount = it.advancePaid,
+                        paymentDate = it.orderDate,
+                        paymentMethod = PaymentMethod.CASH
+                    )
+                }
         } catch (e: Exception) {
-            emptyList()
+            val orders = try { getAllOrdersList() } catch (_: Exception) { emptyList() }
+            orders.filter { it.orderDate in start until end && it.advancePaid > 0 }
+                .map {
+                    Payment(
+                        orderId = it.id,
+                        customerName = it.customerName,
+                        customerMobile = it.customerMobile,
+                        amount = it.advancePaid,
+                        paymentDate = it.orderDate,
+                        paymentMethod = PaymentMethod.CASH
+                    )
+                }
         }
     }
 
@@ -1443,6 +1573,7 @@ data class CustomerJarStats(
     val thisMonthPaid: Double = 0.0,
     val totalPaid: Double = 0.0,
     val pendingBalance: Double = 0.0,
+    val advanceBalance: Double = 0.0,
     val pendingReturnJars: Int = 0,
     val lastJarQuantity: Int = 0,
     val lastJarDate: Long = 0L,

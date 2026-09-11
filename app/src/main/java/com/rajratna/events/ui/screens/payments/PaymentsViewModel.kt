@@ -36,9 +36,21 @@ class PaymentsViewModel(application: Application) : AndroidViewModel(application
             val weekRec = repository.getTotalPaymentReceived(ws, we)
             val monthRec = repository.getTotalPaymentReceived(ms, me)
             val overallPend = repository.getOverallPendingBalance()
-            _state.value = _state.value.copy(todayReceived = todayRec, todayPending = todayPend, weekReceived = weekRec, monthReceived = monthRec, overallPending = overallPend)
             repository.getAllPayments().collect { payments ->
-                _state.value = _state.value.copy(payments = payments, isLoading = false)
+                val newTodayRec = repository.getTotalPaymentReceived(ts, te)
+                val newTodayPend = repository.getTotalPendingBalance(ts, te)
+                val newWeekRec = repository.getTotalPaymentReceived(ws, we)
+                val newMonthRec = repository.getTotalPaymentReceived(ms, me)
+                val newOverallPend = repository.getOverallPendingBalance()
+                _state.value = _state.value.copy(
+                    payments = payments,
+                    isLoading = false,
+                    todayReceived = newTodayRec,
+                    todayPending = newTodayPend,
+                    weekReceived = newWeekRec,
+                    monthReceived = newMonthRec,
+                    overallPending = newOverallPend
+                )
             }
         }
     }

@@ -16,6 +16,7 @@ data class Customer(
     val totalJars: Int = 0,
     val pendingReturnJars: Int = 0,
     val pendingAmount: Double = 0.0,
+    val advanceBalance: Double = 0.0,
     val createdAt: Long = System.currentTimeMillis(),
     @get:PropertyName("deleted")
     @set:PropertyName("deleted")
