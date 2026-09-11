@@ -54,7 +54,13 @@ data class NewOrderState(
     // Result
     val savedOrderId: String? = null,
     val errorMessage: String? = null
-)
+) {
+    val isOnlyCustomerJar: Boolean
+        get() {
+            val selected = itemEntries.filter { it.quantity > 0 }
+            return selected.isNotEmpty() && selected.all { it.isCustomerOwned }
+        }
+}
 
 class NewOrderViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -217,7 +223,8 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
     private fun recalculate() {
         val s = _state.value
         val itemsTotal = s.itemEntries.sumOf {
-            it.quantity * it.effectiveRate * s.rentalDays
+            val days = if (it.isCustomerOwned || s.isOnlyCustomerJar) 1 else s.rentalDays
+            it.quantity * it.effectiveRate * days
         }
         val transport = s.transportRent.toDoubleOrNull() ?: 0.0
         val discount = s.discountAmount.toDoubleOrNull() ?: 0.0
@@ -289,8 +296,8 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
             _state.value = s.copy(errorMessage = "Customer name is required")
             return
         }
-        if (s.mobileNumber.isBlank() || s.mobileNumber.length < 10) {
-            _state.value = s.copy(errorMessage = "Valid mobile number is required")
+        if (s.mobileNumber.isNotBlank() && s.mobileNumber.trim().length < 10) {
+            _state.value = s.copy(errorMessage = "Please enter a valid 10-digit mobile number or leave blank")
             return
         }
         if (s.itemEntries.none { it.quantity > 0 }) {
@@ -317,28 +324,42 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
             }
 
             // Find or create customer
-            var customer = repository.getCustomerByMobile(s.mobileNumber)
+            var customer: Customer? = null
+            if (s.mobileNumber.isNotBlank()) {
+                customer = repository.getCustomerByMobile(s.mobileNumber.trim())
+            }
+            if (customer == null && s.customerName.isNotBlank()) {
+                customer = repository.getCustomerByName(s.customerName.trim())
+            }
             if (customer == null) {
                 val customerId = repository.insertCustomer(
                     Customer(
-                        name = s.customerName,
-                        mobileNumber = s.mobileNumber,
-                        address = s.address
+                        name = s.customerName.trim(),
+                        mobileNumber = s.mobileNumber.trim(),
+                        address = s.address.trim()
                     )
                 )
-                customer = Customer(id = customerId, name = s.customerName, mobileNumber = s.mobileNumber, address = s.address)
+                customer = Customer(
+                    id = customerId,
+                    name = s.customerName.trim(),
+                    mobileNumber = s.mobileNumber.trim(),
+                    address = s.address.trim()
+                )
             }
+
+            val effectiveReturnDate = if (s.isOnlyCustomerJar) s.deliveryDate else s.returnDate
+            val effectiveRentalDays = if (s.isOnlyCustomerJar) 1 else s.rentalDays
 
             val order = Order(
                 id = if (s.isEditMode) s.editOrderId!! else "",
                 customerId = customer.id,
-                customerName = s.customerName,
-                customerMobile = s.mobileNumber,
-                customerAddress = s.address,
+                customerName = s.customerName.trim(),
+                customerMobile = s.mobileNumber.trim(),
+                customerAddress = s.address.trim(),
                 orderDate = s.orderDate,
                 deliveryDate = s.deliveryDate,
-                returnDate = s.returnDate,
-                rentalDays = s.rentalDays,
+                returnDate = effectiveReturnDate,
+                rentalDays = effectiveRentalDays,
                 notes = s.notes,
                 itemsTotal = s.itemsTotal,
                 transportRent = transport,
@@ -353,14 +374,15 @@ class NewOrderViewModel(application: Application) : AndroidViewModel(application
             val orderItems = s.itemEntries
                 .filter { it.quantity > 0 }
                 .map { entry ->
+                    val itemDays = if (entry.isCustomerOwned || s.isOnlyCustomerJar) 1 else effectiveRentalDays
                     OrderItem(
                         orderId = "", // Will be set by repository
                         itemId = entry.item.id,
                         itemName = entry.item.name,
                         quantity = entry.quantity,
                         ratePerDay = entry.effectiveRate,
-                        rentalDays = s.rentalDays,
-                        totalAmount = entry.quantity * entry.effectiveRate * s.rentalDays,
+                        rentalDays = itemDays,
+                        totalAmount = entry.quantity * entry.effectiveRate * itemDays,
                         isCustomerOwned = entry.isCustomerOwned
                     )
                 }

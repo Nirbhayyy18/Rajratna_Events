@@ -121,13 +121,13 @@ class AppRepository(
 
     fun getAllCustomers(): Flow<List<Customer>> = callbackFlow {
         val registration = customersCol
-            .whereEqualTo("deleted", false)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
-                val customers = snapshot?.toObjects(Customer::class.java) ?: emptyList()
+                val customers = snapshot?.toObjects(Customer::class.java)
+                    ?.filter { !it.isDeleted } ?: emptyList()
                 trySend(customers.sortedBy { it.name.lowercase() })
             }
         awaitClose { registration.remove() }
@@ -136,27 +136,26 @@ class AppRepository(
     suspend fun getCustomerById(id: String): Customer? {
         return try {
             val doc = customersCol.document(id).get().await()
-            doc.toObject(Customer::class.java)
+            val cust = doc.toObject(Customer::class.java)
+            if (cust?.isDeleted == true) null else cust
         } catch (e: Exception) {
             null
         }
     }
 
     fun searchCustomers(query: String): Flow<List<Customer>> = callbackFlow {
-        // Firestore doesn't support LIKE queries natively.
-        // We listen to all non-deleted customers and filter client-side.
         val registration = customersCol
-            .whereEqualTo("deleted", false)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     trySend(emptyList())
                     return@addSnapshotListener
                 }
-                val all = snapshot?.toObjects(Customer::class.java) ?: emptyList()
-                val lowerQuery = query.lowercase()
+                val all = snapshot?.toObjects(Customer::class.java)
+                    ?.filter { !it.isDeleted } ?: emptyList()
+                val lowerQuery = query.trim().lowercase()
                 val filtered = all.filter {
                     it.name.lowercase().contains(lowerQuery) ||
-                    it.mobileNumber.contains(query)
+                    (it.mobileNumber.isNotBlank() && it.mobileNumber.contains(query.trim()))
                 }.sortedBy { it.name }
                 trySend(filtered)
             }
@@ -164,12 +163,24 @@ class AppRepository(
     }
 
     suspend fun getCustomerByMobile(mobile: String): Customer? {
+        if (mobile.isBlank()) return null
+        val cleanMobile = mobile.trim()
         return try {
-            val snapshot = customersCol
-                .whereEqualTo("deleted", false)
-                .get().await()
+            val snapshot = customersCol.get().await()
             snapshot.toObjects(Customer::class.java)
-                .firstOrNull { it.mobileNumber == mobile }
+                .firstOrNull { !it.isDeleted && it.mobileNumber.trim() == cleanMobile }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun getCustomerByName(name: String): Customer? {
+        if (name.isBlank()) return null
+        val cleanName = name.trim().lowercase()
+        return try {
+            val snapshot = customersCol.get().await()
+            snapshot.toObjects(Customer::class.java)
+                .firstOrNull { !it.isDeleted && it.name.trim().lowercase() == cleanName }
         } catch (e: Exception) {
             null
         }
@@ -177,7 +188,7 @@ class AppRepository(
 
     suspend fun insertCustomer(customer: Customer): String {
         val docRef = customersCol.document()
-        val newCustomer = customer.copy(id = docRef.id)
+        val newCustomer = customer.copy(id = docRef.id, isDeleted = false)
         docRef.set(newCustomer).await()
         return docRef.id
     }
@@ -185,6 +196,12 @@ class AppRepository(
     suspend fun updateCustomer(customer: Customer) {
         if (customer.id.isNotEmpty()) {
             customersCol.document(customer.id).set(customer).await()
+        }
+    }
+
+    suspend fun deleteCustomer(customerId: String) {
+        if (customerId.isNotEmpty()) {
+            customersCol.document(customerId).update("deleted", true).await()
         }
     }
 
@@ -1050,6 +1067,8 @@ class AppRepository(
         val monthStart = DateUtils.startOfThisMonth()
         val monthEnd = DateUtils.endOfThisMonth()
 
+        val customer = getCustomerById(customerId)
+
         val allOrders = getAllOrdersList()
             .filter { it.customerId == customerId && it.orderStatus != OrderStatus.CANCELLED }
 
@@ -1076,11 +1095,11 @@ class AppRepository(
 
         // Total paid for this customer
         val totalOrderAmount = allOrders.sumOf { it.grandTotal }
-        val pendingBalance = allOrders.sumOf { it.balanceAmount }
-        val paidAmount = totalOrderAmount - pendingBalance
+        val pendingBalance = (customer?.pendingAmount ?: 0.0) + allOrders.sumOf { it.balanceAmount }
+        val paidAmount = totalOrderAmount - allOrders.sumOf { it.balanceAmount }
 
-        // Pending return jars (Our Jar only, across all active orders)
-        var pendingReturnJars = 0
+        // Pending return jars (Our Jar only, across all active orders + notebook baseline)
+        var pendingReturnJars = customer?.pendingReturnJars ?: 0
         for (order in allOrders) {
             if (order.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED)) {
                 val items = orderItemsByOrder[order.id] ?: emptyList()
@@ -1233,13 +1252,24 @@ class AppRepository(
         awaitClose { registration.remove() }
     }
 
+    fun getAllPaymentsFlow(): Flow<List<Payment>> = callbackFlow {
+        val registration = db.collectionGroup("payments")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val payments = snapshot?.toObjects(Payment::class.java) ?: emptyList()
+                trySend(payments.sortedByDescending { it.paymentDate })
+            }
+        awaitClose { registration.remove() }
+    }
+
     fun getPaymentsInRange(start: Long, end: Long): Flow<List<Payment>> = flow {
         try {
-            val payments = db.collectionGroup("payments")
-                .whereGreaterThanOrEqualTo("paymentDate", start)
-                .whereLessThan("paymentDate", end)
-                .get().await()
-                .toObjects(Payment::class.java)
+            val snap = db.collectionGroup("payments").get().await()
+            val payments = snap.toObjects(Payment::class.java)
+                .filter { it.paymentDate in start until end }
             emit(payments.sortedByDescending { it.paymentDate })
         } catch (e: Exception) {
             emit(emptyList())
@@ -1248,11 +1278,8 @@ class AppRepository(
 
     suspend fun getPaymentsInRangeList(start: Long, end: Long): List<Payment> {
         return try {
-            val snap = db.collectionGroup("payments")
-                .whereGreaterThanOrEqualTo("paymentDate", start)
-                .whereLessThan("paymentDate", end)
-                .get().await()
-            snap.toObjects(Payment::class.java)
+            val snap = db.collectionGroup("payments").get().await()
+            snap.toObjects(Payment::class.java).filter { it.paymentDate in start until end }
         } catch (e: Exception) {
             emptyList()
         }
@@ -1270,11 +1297,10 @@ class AppRepository(
 
     suspend fun getTotalPaymentReceived(start: Long, end: Long): Double {
         return try {
-            val snap = db.collectionGroup("payments")
-                .whereGreaterThanOrEqualTo("paymentDate", start)
-                .whereLessThan("paymentDate", end)
-                .get().await()
-            snap.toObjects(Payment::class.java).sumOf { it.amount }
+            val snap = db.collectionGroup("payments").get().await()
+            snap.toObjects(Payment::class.java)
+                .filter { it.paymentDate in start until end }
+                .sumOf { it.amount }
         } catch (e: Exception) {
             0.0
         }

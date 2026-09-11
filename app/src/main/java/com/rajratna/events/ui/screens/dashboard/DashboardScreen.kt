@@ -158,14 +158,14 @@ fun DashboardScreen(
                     }
 
                     // ── Quick Actions Row ─────────────────
-                    item {
-                        QuickActionsRow(
-                            onNavigateToNewOrder  = onNavigateToNewOrder,
-                            onNavigateToReturns   = onNavigateToReturns,
-                            onNavigateToPayments  = onNavigateToPayments,
-                            onNavigateToReports   = onNavigateToReports
-                        )
-                    }
+//                    item {
+//                        QuickActionsRow(
+//                            onNavigateToNewOrder  = onNavigateToNewOrder,
+//                            onNavigateToReturns   = onNavigateToReturns,
+//                            onNavigateToPayments  = onNavigateToPayments,
+//                            onNavigateToReports   = onNavigateToReports
+//                        )
+//                    }
 
                     // ── Alerts section ───────────────────
                     item { SectionTitle("Important Alerts") }

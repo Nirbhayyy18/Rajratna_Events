@@ -126,7 +126,7 @@ fun CustomerDetailsScreen(
                                 )
 
                                 Text(
-                                    text = customer.mobileNumber,
+                                    text = if (customer.mobileNumber.isNotBlank()) customer.mobileNumber else "Walk-in Customer",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -140,21 +140,23 @@ fun CustomerDetailsScreen(
                                 }
                             }
 
-                            Spacer(Modifier.width(12.dp))
+                            if (customer.mobileNumber.isNotBlank()) {
+                                Spacer(Modifier.width(12.dp))
 
-                            // Call Button
-                            FilledTonalIconButton(
-                                onClick = {
-                                    WhatsAppUtils.callCustomer(
-                                        context,
-                                        customer.mobileNumber
+                                // Call Button
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        WhatsAppUtils.callCustomer(
+                                            context,
+                                            customer.mobileNumber
+                                        )
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.Call,
+                                        contentDescription = "Call Customer"
                                     )
                                 }
-                            ) {
-                                Icon(
-                                    Icons.Default.Call,
-                                    contentDescription = "Call Customer"
-                                )
                             }
                         }
                     }

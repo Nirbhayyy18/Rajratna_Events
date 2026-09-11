@@ -95,6 +95,34 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     init {
         loadDashboard()
+        observeDataChanges()
+    }
+
+    private fun observeDataChanges() {
+        viewModelScope.launch {
+            repository.getAllOrders().collect {
+                refreshDashboardSilently()
+            }
+        }
+        viewModelScope.launch {
+            repository.getAllPaymentsFlow().collect {
+                refreshDashboardSilently()
+            }
+        }
+    }
+
+    private fun refreshDashboardSilently() {
+        viewModelScope.launch {
+            try {
+                val updated = buildDashboardState(
+                    selectedStockDate = _state.value.selectedStockDate,
+                    selectedOverviewDate = _state.value.selectedOverviewDate
+                )
+                _state.value = updated.copy(isLoading = false)
+            } catch (e: Exception) {
+                // Keep existing state on error
+            }
+        }
     }
 
     fun loadDashboard() {

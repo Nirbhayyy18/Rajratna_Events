@@ -138,7 +138,8 @@ fun NewOrderScreen(
                         OutlinedTextField(
                             value = state.mobileNumber,
                             onValueChange = { viewModel.updateMobileNumber(it) },
-                            label = { Text("Mobile Number *") },
+                            label = { Text("Mobile Number (optional)") },
+                            placeholder = { Text("Leave blank for walk-in") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             modifier = Modifier.fillMaxWidth(),
@@ -148,7 +149,7 @@ fun NewOrderScreen(
                         OutlinedTextField(
                             value = state.address,
                             onValueChange = { viewModel.updateAddress(it) },
-                            label = { Text("Delivery Address") },
+                            label = { Text("Delivery Address (optional)") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
@@ -156,61 +157,7 @@ fun NewOrderScreen(
                     }
                 }
 
-                // ── Dates ───────────────────────────────────
-                item {
-                    SectionCard(title = "📅 Order Dates") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            DateField(
-                                label = "Delivery Date",
-                                date = state.deliveryDate,
-                                onDateSelected = { viewModel.updateDeliveryDate(it) },
-                                modifier = Modifier.weight(1f)
-                            )
-                            DateField(
-                                label = "Return Date",
-                                date = state.returnDate,
-                                onDateSelected = { viewModel.updateReturnDate(it) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.CalendarMonth,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = "Rental Days: ${state.rentalDays}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = state.notes,
-                            onValueChange = { viewModel.updateNotes(it) },
-                            label = { Text("Notes (optional)") },
-                            maxLines = 3,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                    }
-                }
-
-                // ── Items Selection ─────────────────────────
+                // ── Items Selection (Placed BEFORE Dates) ────
                 item {
                     SectionCard(title = "📦 Items") {
                         if (state.isCheckingStock) {
@@ -234,7 +181,7 @@ fun NewOrderScreen(
                                 rate = entry.effectiveRate,
                                 defaultRate = entry.item.ratePerDay,
                                 quantity = entry.quantity,
-                                rentalDays = state.rentalDays,
+                                rentalDays = if (entry.isCustomerOwned || state.isOnlyCustomerJar) 1 else state.rentalDays,
                                 deliveryDate = state.deliveryDate,
                                 isCustomerOwned = entry.isCustomerOwned,
                                 availableForDates = available,
@@ -251,6 +198,93 @@ fun NewOrderScreen(
                                 )
                             }
                         }
+                    }
+                }
+
+                // ── Dates (Placed AFTER Items) ─────────────
+                item {
+                    SectionCard(title = "📅 Order Dates") {
+                        if (state.isOnlyCustomerJar) {
+                            // Customer Jar: Only Delivery/Order Date needed
+                            DateField(
+                                label = "Order / Delivery Date",
+                                date = state.deliveryDate,
+                                onDateSelected = { viewModel.updateDeliveryDate(it) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.WaterDrop,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Customer's own jar: No return date or rental days required",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                DateField(
+                                    label = "Delivery Date",
+                                    date = state.deliveryDate,
+                                    onDateSelected = { viewModel.updateDeliveryDate(it) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                DateField(
+                                    label = "Return Date",
+                                    date = state.returnDate,
+                                    onDateSelected = { viewModel.updateReturnDate(it) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.CalendarMonth,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "Rental Days: ${state.rentalDays}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = state.notes,
+                            onValueChange = { viewModel.updateNotes(it) },
+                            label = { Text("Notes (optional)") },
+                            maxLines = 3,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
                     }
                 }
 

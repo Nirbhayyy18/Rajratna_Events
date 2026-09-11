@@ -70,10 +70,10 @@ object MarathiBillGenerator {
 
     // ── Page Dimensions ─────────────────────────────────────
 
-    // A4 at 72 DPI: 595 x 842 points
+    // A4 at 72 DPI: 595 width
     private const val PAGE_WIDTH = 595f
-    private const val MARGIN_LEFT = 40f
-    private const val MARGIN_RIGHT = 40f
+    private const val MARGIN_LEFT = 32f
+    private const val MARGIN_RIGHT = 32f
     private const val CONTENT_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT
 
     // ── Font Loading ────────────────────────────────────────
@@ -142,7 +142,6 @@ object MarathiBillGenerator {
         items: List<OrderItem>,
         totalPaid: Double
     ): File {
-        // Use 2x scale for crisp image on phone screens
         val scale = 2f
         val width = (PAGE_WIDTH * scale).toInt()
         val pageHeight = calculatePageHeight(context, order, items)
@@ -208,74 +207,37 @@ object MarathiBillGenerator {
         order: Order,
         items: List<OrderItem>
     ): Float {
-        val regular = getRegularTypeface(context)
-        val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = regular; textSize = 11f
-        }
-        val taglinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = regular; textSize = 9f
-        }
-
         var h = 0f
-        // Top padding
-        h += 30f
-        // Blessing
-        h += 20f + 10f
-        // Business name + address
-        h += 16f + 6f + 14f + 6f
-        // Tagline (wrapped)
-        h += measureWrappedTextHeight(BUSINESS_TAGLINE, taglinePaint, CONTENT_WIDTH) + 6f
-        // Owner name + mobile
-        h += 13f + 4f + 13f + 16f
-        // Thin separator
-        h += 1f + 12f
-        // Bill no + date row
-        h += 14f + 12f
-        // Customer details (name, mobile, address, delivery, return, rental)
-        h += 14f + 6f // name
-        h += 14f + 6f // mobile
-        if (order.customerAddress.isNotBlank()) {
-            h += measureWrappedTextHeight("$LABEL_ADDRESS ${order.customerAddress}", bodyPaint, CONTENT_WIDTH) + 6f
-        }
-        h += 14f + 6f // delivery date
-        h += 14f + 6f // return date
-        h += 14f + 16f // rental days
-        // Separator
-        h += 1f + 8f
+        // Top margin
+        h += 16f
+        // Header (blessing, business name, address/mobile, proprietor, tagline)
+        h += 15f + 22f + 16f + 14f + 14f + 8f // ~89f
+        // Customer & Bill Details Card (2-column)
+        val custCardHeight = if (order.customerAddress.isNotBlank()) 62f else 48f
+        h += custCardHeight + 8f
         // Table header
-        h += 14f + 8f + 1f + 8f
-        // Item rows
+        h += 24f
+        // Table item rows
+        val regular = getRegularTypeface(context)
+        val cellPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = regular; textSize = 11f }
         items.forEach { item ->
             val marathiName = getMarathiItemName(item.itemName, item.isCustomerOwned)
-            val rowH = measureWrappedTextHeight(marathiName, bodyPaint, 140f)
-            h += maxOf(16f, rowH) + 6f
+            val lines = wrapText(marathiName, cellPaint, 240f)
+            val rowH = maxOf(22f, lines.size * 14f + 6f)
+            h += rowH
         }
-        // Transport row
+        // Transport row if any
         if (order.transportRent > 0) {
-            h += 16f + 6f
+            h += 22f
         }
-        // Discount row
-        if (order.discountAmount > 0) {
-            h += 16f + 8f
-        }
-        // Separator
-        h += 1f + 10f
-        // Totals (3 rows)
-        h += 16f + 8f // total
-        h += 16f + 8f // paid
-        h += 18f + 16f // balance (bold, larger)
-        // Separator
-        h += 1f + 16f
-        // Note
-        h += 12f + 4f
-        h += measureWrappedTextHeight(NOTE_TEXT, bodyPaint, CONTENT_WIDTH) + 30f
-        // Signature area
-        h += 1f + 8f // line
-        h += 14f + 30f // labels
-        // Bottom padding
-        h += 20f
+        // Gap after table
+        h += 10f
+        // Side-by-side Totals, Note, and Signatures section
+        h += 118f
+        // Bottom margin
+        h += 16f
 
-        return maxOf(h, 600f) // minimum page height
+        return h
     }
 
     // ── Core Draw Method ────────────────────────────────────
@@ -295,323 +257,329 @@ object MarathiBillGenerator {
 
         // ── Paints ──────────────────────────────────────────
         val bgPaint = Paint().apply { color = Color.WHITE; style = Paint.Style.FILL }
-        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#CCCCCC"); style = Paint.Style.STROKE; strokeWidth = 1.5f
+        val outerBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#B0BEC5"); style = Paint.Style.STROKE; strokeWidth = 1.2f
         }
-        val blessingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = bold; textSize = 16f; color = Color.parseColor("#B71C1C"); textAlign = Paint.Align.CENTER
+        val innerBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#ECEFF1"); style = Paint.Style.STROKE; strokeWidth = 0.8f
         }
-        val businessNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = bold; textSize = 14f; color = Color.parseColor("#1A1A1A"); textAlign = Paint.Align.CENTER
+        val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#F8FAFC"); style = Paint.Style.FILL
         }
-        val businessAddrPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = regular; textSize = 11f; color = Color.parseColor("#444444"); textAlign = Paint.Align.CENTER
+        val cardBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E2E8F0"); style = Paint.Style.STROKE; strokeWidth = 1f
         }
-        val taglinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = regular; textSize = 9f; color = Color.parseColor("#666666"); textAlign = Paint.Align.CENTER
-        }
-        val ownerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = bold; textSize = 11f; color = Color.parseColor("#333333"); textAlign = Paint.Align.CENTER
-        }
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = bold; textSize = 11f; color = Color.parseColor("#333333")
-        }
-        val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = regular; textSize = 11f; color = Color.parseColor("#1A1A1A")
-        }
-        val tableHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = bold; textSize = 10f; color = Color.parseColor("#1A1A1A")
-        }
-        val tableCellPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = regular; textSize = 10f; color = Color.parseColor("#333333")
-        }
-        val amountCellPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = regular; textSize = 10f; color = Color.parseColor("#333333"); textAlign = Paint.Align.RIGHT
-        }
-        val totalLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = bold; textSize = 12f; color = Color.parseColor("#1A1A1A")
-        }
-        val totalValuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = bold; textSize = 12f; color = Color.parseColor("#1A1A1A"); textAlign = Paint.Align.RIGHT
-        }
-        val balanceLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = bold; textSize = 13f; color = Color.parseColor("#B71C1C")
-        }
-        val balanceValuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = bold; textSize = 13f; color = Color.parseColor("#B71C1C"); textAlign = Paint.Align.RIGHT
+        val tableHeaderBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#F1F5F9"); style = Paint.Style.FILL
         }
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#DDDDDD"); strokeWidth = 0.8f
+            color = Color.parseColor("#E2E8F0"); strokeWidth = 0.8f
         }
-        val dashedLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#CCCCCC"); strokeWidth = 0.8f
-            pathEffect = DashPathEffect(floatArrayOf(4f, 3f), 0f)
+        val noteBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FEF2F2"); style = Paint.Style.FILL
         }
-        val notePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = regular; textSize = 9f; color = Color.parseColor("#666666")
+        val noteBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FECACA"); style = Paint.Style.STROKE; strokeWidth = 0.8f
         }
-        val noteBoldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = bold; textSize = 9f; color = Color.parseColor("#666666")
+
+        // Typography Paints
+        val blessingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 12.5f; color = Color.parseColor("#B71C1C"); textAlign = Paint.Align.CENTER
         }
-        val signPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = regular; textSize = 10f; color = Color.parseColor("#666666")
+        val businessNamePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 18f; color = Color.parseColor("#0F172A"); textAlign = Paint.Align.CENTER
+        }
+        val businessInfoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 10.5f; color = Color.parseColor("#334155"); textAlign = Paint.Align.CENTER
+        }
+        val proprietorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = regular; textSize = 9.5f; color = Color.parseColor("#475569"); textAlign = Paint.Align.CENTER
+        }
+        val taglinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = regular; textSize = 9f; color = Color.parseColor("#64748B"); textAlign = Paint.Align.CENTER
+        }
+
+        val labelBoldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 10.5f; color = Color.parseColor("#334155")
+        }
+        val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = regular; textSize = 10.5f; color = Color.parseColor("#0F172A")
+        }
+        val valueBoldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 11.5f; color = Color.parseColor("#0F172A")
+        }
+
+        val thPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 10.5f; color = Color.parseColor("#1E293B")
+        }
+        val thCenterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 10.5f; color = Color.parseColor("#1E293B"); textAlign = Paint.Align.CENTER
+        }
+        val thRightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 10.5f; color = Color.parseColor("#1E293B"); textAlign = Paint.Align.RIGHT
+        }
+
+        val cellPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = regular; textSize = 11f; color = Color.parseColor("#1E293B")
+        }
+        val cellCenterPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = regular; textSize = 11f; color = Color.parseColor("#1E293B"); textAlign = Paint.Align.CENTER
+        }
+        val cellRightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = regular; textSize = 11f; color = Color.parseColor("#1E293B"); textAlign = Paint.Align.RIGHT
+        }
+        val cellAmountPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 11.5f; color = Color.parseColor("#0F172A"); textAlign = Paint.Align.RIGHT
+        }
+
+        val totalLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 11f; color = Color.parseColor("#334155")
+        }
+        val totalValuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 11.5f; color = Color.parseColor("#0F172A"); textAlign = Paint.Align.RIGHT
+        }
+        val paidValuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 11.5f; color = Color.parseColor("#15803D"); textAlign = Paint.Align.RIGHT
+        }
+        val balanceLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 12.5f; color = Color.parseColor("#DC2626")
+        }
+        val balanceValuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 13f; color = Color.parseColor("#DC2626"); textAlign = Paint.Align.RIGHT
+        }
+
+        val noteTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = regular; textSize = 9f; color = Color.parseColor("#991B1B")
+        }
+        val noteTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 9.5f; color = Color.parseColor("#991B1B")
+        }
+        val signLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = regular; textSize = 9.5f; color = Color.parseColor("#475569"); textAlign = Paint.Align.CENTER
+        }
+        val signPropLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold; textSize = 10f; color = Color.parseColor("#0F172A"); textAlign = Paint.Align.CENTER
         }
 
         val centerX = width / 2f
         val rightX = width - MARGIN_RIGHT
 
-        // ── Background & Border ─────────────────────────────
+        // ── Outer Background & Frame ────────────────────────
         canvas.drawRect(0f, 0f, width, height, bgPaint)
-        canvas.drawRect(8f, 8f, width - 8f, height - 8f, borderPaint)
+        canvas.drawRect(6f, 6f, width - 6f, height - 6f, outerBorderPaint)
+        canvas.drawRect(9f, 9f, width - 9f, height - 9f, innerBorderPaint)
 
-        var y = 30f
+        var y = 16f
 
         // ══════════════════════════════════════════════════════
-        // HEADER
+        // 1. HEADER (Compact & Elegant)
         // ══════════════════════════════════════════════════════
 
         // Blessing
-        canvas.drawText(HEADER_BLESSING, centerX, y + 16f, blessingPaint)
-        y += 20f + 10f
+        canvas.drawText(HEADER_BLESSING, centerX, y + 11f, blessingPaint)
+        y += 15f
 
         // Business name
-        canvas.drawText(BUSINESS_NAME, centerX, y + 14f, businessNamePaint)
-        y += 16f + 6f
+        canvas.drawText(BUSINESS_NAME, centerX, y + 16f, businessNamePaint)
+        y += 22f
 
-        // Business address
-        canvas.drawText(BUSINESS_ADDRESS, centerX, y + 11f, businessAddrPaint)
-        y += 14f + 6f
+        // Address & Mobile in one clear line
+        val businessContactText = "$BUSINESS_ADDRESS   |   $OWNER_MOBILE"
+        canvas.drawText(businessContactText, centerX, y + 11f, businessInfoPaint)
+        y += 16f
 
-        // Tagline (centered, wrapped)
-        y = drawWrappedTextCentered(canvas, BUSINESS_TAGLINE, taglinePaint, centerX, y, CONTENT_WIDTH)
-        y += 6f
+        // Proprietor
+        canvas.drawText(OWNER_NAME, centerX, y + 10f, proprietorPaint)
+        y += 14f
 
-        // Owner name
-        canvas.drawText(OWNER_NAME, centerX, y + 11f, ownerPaint)
-        y += 13f + 4f
-
-        // Owner mobile
-        canvas.drawText(OWNER_MOBILE, centerX, y + 11f, businessAddrPaint)
-        y += 13f + 16f
-
-        // Thin separator
-        canvas.drawLine(MARGIN_LEFT, y, rightX, y, linePaint)
-        y += 1f + 12f
-
-        // ══════════════════════════════════════════════════════
-        // BILL INFO & CUSTOMER DETAILS
-        // ══════════════════════════════════════════════════════
-
-        // Bill number & date on the same row
-        canvas.drawText("$LABEL_BILL_NO #${order.billNumber}", MARGIN_LEFT, y + 12f, labelPaint)
-        val dateText = "$LABEL_DATE ${DateUtils.formatMarathiDate(order.orderDate)}"
-        canvas.drawText(dateText, rightX - valuePaint.measureText(dateText), y + 12f, valuePaint)
-        y += 14f + 12f
-
-        // Customer name
-        drawLabelValue(canvas, LABEL_CUSTOMER_NAME, order.customerName, MARGIN_LEFT, y, labelPaint, valuePaint)
-        y += 14f + 6f
-
-        // Mobile
-        drawLabelValue(canvas, LABEL_MOBILE, order.customerMobile, MARGIN_LEFT, y, labelPaint, valuePaint)
-        y += 14f + 6f
-
-        // Address (wrapping)
-        if (order.customerAddress.isNotBlank()) {
-            val addressText = "$LABEL_ADDRESS ${order.customerAddress}"
-            y = drawWrappedText(canvas, addressText, valuePaint, MARGIN_LEFT, y, CONTENT_WIDTH)
-            y += 6f
-        }
-
-        // Delivery date
-        drawLabelValue(canvas, LABEL_DELIVERY_DATE, DateUtils.formatMarathiDate(order.deliveryDate), MARGIN_LEFT, y, labelPaint, valuePaint)
-        y += 14f + 6f
-
-        // Return date
-        drawLabelValue(canvas, LABEL_RETURN_DATE, DateUtils.formatMarathiDate(order.returnDate), MARGIN_LEFT, y, labelPaint, valuePaint)
-        y += 14f + 6f
-
-        // Rental days
-        drawLabelValue(canvas, LABEL_RENTAL_DAYS, "${order.rentalDays}", MARGIN_LEFT, y, labelPaint, valuePaint)
-        y += 14f + 16f
-
-        // ══════════════════════════════════════════════════════
-        // ITEM TABLE
-        // ══════════════════════════════════════════════════════
-
-        // Separator
-        canvas.drawLine(MARGIN_LEFT, y, rightX, y, linePaint)
-        y += 1f + 8f
-
-        // Table column positions
-        val colSr = MARGIN_LEFT
-        val colDetails = MARGIN_LEFT + 40f
-        val colQty = MARGIN_LEFT + 200f
-        val colRate = MARGIN_LEFT + 250f
-        val colDays = MARGIN_LEFT + 310f
-        val colAmount = rightX
-
-        // Header row
-        canvas.drawText(TH_SR, colSr, y + 10f, tableHeaderPaint)
-        canvas.drawText(TH_DETAILS, colDetails, y + 10f, tableHeaderPaint)
-        canvas.drawText(TH_QTY, colQty, y + 10f, tableHeaderPaint)
-        canvas.drawText(TH_RATE, colRate, y + 10f, tableHeaderPaint)
-        canvas.drawText(TH_DAYS, colDays, y + 10f, tableHeaderPaint)
-        canvas.drawText(TH_AMOUNT, colAmount, y + 10f, Paint(amountCellPaint).apply { typeface = bold; textAlign = Paint.Align.RIGHT })
-        y += 14f + 8f
+        // Services Tagline
+        canvas.drawText(BUSINESS_TAGLINE, centerX, y + 9f, taglinePaint)
+        y += 14f
 
         // Header separator
-        canvas.drawLine(MARGIN_LEFT, y, rightX, y, dashedLinePaint)
-        y += 1f + 8f
+        canvas.drawLine(MARGIN_LEFT, y, rightX, y, linePaint)
+        y += 8f
 
-        // Item rows
+        // ══════════════════════════════════════════════════════
+        // 2. CUSTOMER & BILL INFO (Compact 2-Column Grid Box)
+        // ══════════════════════════════════════════════════════
+
+        val hasAddress = order.customerAddress.isNotBlank()
+        val cardHeight = if (hasAddress) 62f else 48f
+        val cardRect = RectF(MARGIN_LEFT, y, rightX, y + cardHeight)
+        canvas.drawRoundRect(cardRect, 6f, 6f, cardBgPaint)
+        canvas.drawRoundRect(cardRect, 6f, 6f, cardBorderPaint)
+
+        val col1X = MARGIN_LEFT + 10f
+        val col2X = centerX + 12f
+        var cardRowY = y + 13f
+
+        // Row 1: Customer Name (Left) | Bill No & Date (Right)
+        canvas.drawText(LABEL_CUSTOMER_NAME, col1X, cardRowY, labelBoldPaint)
+        val nameLabelWidth = labelBoldPaint.measureText(LABEL_CUSTOMER_NAME)
+        canvas.drawText(" ${order.customerName}", col1X + nameLabelWidth, cardRowY, valueBoldPaint)
+
+        val billNoText = "$LABEL_BILL_NO #${order.billNumber}   $LABEL_DATE ${DateUtils.formatMarathiDate(order.orderDate)}"
+        canvas.drawText(billNoText, col2X, cardRowY, labelBoldPaint)
+
+        // Row 2: Mobile (Left) | Delivery Date (Right)
+        cardRowY += 16f
+        canvas.drawText(LABEL_MOBILE, col1X, cardRowY, labelBoldPaint)
+        val mobileLabelWidth = labelBoldPaint.measureText(LABEL_MOBILE)
+        canvas.drawText(" ${order.customerMobile.ifBlank { "-" }}", col1X + mobileLabelWidth, cardRowY, valuePaint)
+
+        val deliveryText = "$LABEL_DELIVERY_DATE ${DateUtils.formatMarathiDate(order.deliveryDate)}"
+        canvas.drawText(deliveryText, col2X, cardRowY, valuePaint)
+
+        // Row 3: Address (Left, if any) | Return Date & Days (Right, if applicable)
+        if (hasAddress || order.rentalDays > 1 || order.returnDate != order.deliveryDate) {
+            cardRowY += 16f
+            if (hasAddress) {
+                val addrText = "$LABEL_ADDRESS ${order.customerAddress.take(45)}"
+                canvas.drawText(addrText, col1X, cardRowY, valuePaint)
+            }
+            if (order.rentalDays > 1 || order.returnDate != order.deliveryDate) {
+                val returnText = "$LABEL_RETURN_DATE ${DateUtils.formatMarathiDate(order.returnDate)} (${order.rentalDays} दिवस)"
+                canvas.drawText(returnText, col2X, cardRowY, valuePaint)
+            }
+        }
+
+        y += cardHeight + 8f
+
+        // ══════════════════════════════════════════════════════
+        // 3. ITEM TABLE (Spacious Columns, Clear Headers)
+        // ══════════════════════════════════════════════════════
+
+        // Column Layout (Total: 531pt)
+        val colSr = MARGIN_LEFT + 15f         // Center (~30pt)
+        val colDetails = MARGIN_LEFT + 36f    // Left (~250pt)
+        val colQty = MARGIN_LEFT + 295f       // Center (~40pt)
+        val colRate = MARGIN_LEFT + 360f      // Right (~50pt)
+        val colDays = MARGIN_LEFT + 405f      // Center (~40pt)
+        val colAmount = rightX - 6f           // Right (~90pt)
+
+        // Table Header Bar
+        val headerHeight = 24f
+        val headerRect = RectF(MARGIN_LEFT, y, rightX, y + headerHeight)
+        canvas.drawRoundRect(headerRect, 4f, 4f, tableHeaderBgPaint)
+        canvas.drawRoundRect(headerRect, 4f, 4f, cardBorderPaint)
+
+        val headerTextY = y + 16f
+        canvas.drawText(TH_SR, colSr, headerTextY, thCenterPaint)
+        canvas.drawText(TH_DETAILS, colDetails, headerTextY, thPaint)
+        canvas.drawText(TH_QTY, colQty, headerTextY, thCenterPaint)
+        canvas.drawText(TH_RATE, colRate, headerTextY, thRightPaint)
+        canvas.drawText(TH_DAYS, colDays, headerTextY, thCenterPaint)
+        canvas.drawText(TH_AMOUNT, colAmount, headerTextY, thRightPaint)
+        y += headerHeight
+
+        // Item Rows
         items.forEachIndexed { index, item ->
             val marathiName = getMarathiItemName(item.itemName, item.isCustomerOwned)
+            val nameLines = wrapText(marathiName, cellPaint, 240f)
+            val rowHeight = maxOf(22f, nameLines.size * 14f + 6f)
 
-            canvas.drawText("${index + 1}", colSr, y + 10f, tableCellPaint)
+            val rowBaseY = y + 15f
+            canvas.drawText("${index + 1}", colSr, rowBaseY, cellCenterPaint)
 
-            // Draw item name (may wrap)
-            val nameWidth = 140f
-            val nameLines = wrapText(marathiName, tableCellPaint, nameWidth)
             nameLines.forEachIndexed { lineIdx, line ->
-                canvas.drawText(line, colDetails, y + 10f + (lineIdx * 14f), tableCellPaint)
+                canvas.drawText(line, colDetails, y + 15f + (lineIdx * 14f), cellPaint)
             }
 
-            canvas.drawText("${item.quantity}", colQty, y + 10f, tableCellPaint)
-            canvas.drawText("₹${item.ratePerDay.toInt()}", colRate, y + 10f, tableCellPaint)
-            canvas.drawText("${item.rentalDays}", colDays, y + 10f, tableCellPaint)
-            canvas.drawText("₹${item.totalAmount.toInt()}", colAmount, y + 10f, amountCellPaint)
+            canvas.drawText("${item.quantity}", colQty, rowBaseY, cellCenterPaint)
+            canvas.drawText("₹${item.ratePerDay.toInt()}", colRate, rowBaseY, cellRightPaint)
+            val daysDisplay = if (item.isCustomerOwned) "-" else "${item.rentalDays}"
+            canvas.drawText(daysDisplay, colDays, rowBaseY, cellCenterPaint)
+            canvas.drawText("₹${item.totalAmount.toInt()}", colAmount, rowBaseY, cellAmountPaint)
 
-            val rowHeight = maxOf(16f, nameLines.size * 14f)
-            y += rowHeight + 6f
+            y += rowHeight
+            canvas.drawLine(MARGIN_LEFT, y, rightX, y, linePaint)
         }
 
-        // Transport rent row
+        // Transport Row (if any)
         if (order.transportRent > 0) {
+            val transportRowY = y + 15f
             val transportIdx = items.size + 1
-            canvas.drawText("$transportIdx", colSr, y + 10f, tableCellPaint)
-            canvas.drawText(LABEL_TRANSPORT, colDetails, y + 10f, tableCellPaint)
-            canvas.drawText("₹${order.transportRent.toInt()}", colAmount, y + 10f, amountCellPaint)
-            y += 16f + 6f
+            canvas.drawText("$transportIdx", colSr, transportRowY, cellCenterPaint)
+            canvas.drawText(LABEL_TRANSPORT, colDetails, transportRowY, cellPaint)
+            canvas.drawText("-", colQty, transportRowY, cellCenterPaint)
+            canvas.drawText("-", colRate, transportRowY, cellRightPaint)
+            canvas.drawText("-", colDays, transportRowY, cellCenterPaint)
+            canvas.drawText("₹${order.transportRent.toInt()}", colAmount, transportRowY, cellAmountPaint)
+
+            y += 22f
+            canvas.drawLine(MARGIN_LEFT, y, rightX, y, linePaint)
         }
 
+        y += 8f
+
         // ══════════════════════════════════════════════════════
-        // TOTALS
+        // 4. SIDE-BY-SIDE SUMMARY & FOOTER
         // ══════════════════════════════════════════════════════
 
-        // Separator
-        canvas.drawLine(MARGIN_LEFT, y, rightX, y, linePaint)
-        y += 1f + 10f
+        val splitX = centerX + 20f
 
-        // Discount row (if any)
+        // ── Right Side: Totals Box ────────
+        val totalsBoxTop = y
+        val totalsBoxHeight = if (order.discountAmount > 0) 90f else 74f
+        val totalsRect = RectF(splitX, totalsBoxTop, rightX, totalsBoxTop + totalsBoxHeight)
+        canvas.drawRoundRect(totalsRect, 6f, 6f, cardBgPaint)
+        canvas.drawRoundRect(totalsRect, 6f, 6f, cardBorderPaint)
+
+        var totalsRowY = totalsBoxTop + 16f
+        val totalsLabelX = splitX + 10f
+        val totalsValueX = rightX - 10f
+
         if (order.discountAmount > 0) {
-            canvas.drawText(LABEL_DISCOUNT, MARGIN_LEFT, y + 12f, totalLabelPaint)
-            canvas.drawText("-₹${String.format("%,d", order.discountAmount.toInt())}", rightX, y + 12f, totalValuePaint)
-            y += 16f + 8f
+            canvas.drawText(LABEL_DISCOUNT, totalsLabelX, totalsRowY, totalLabelPaint)
+            canvas.drawText("-₹${String.format("%,d", order.discountAmount.toInt())}", totalsValueX, totalsRowY, totalValuePaint)
+            totalsRowY += 16f
         }
 
-        // Total
-        canvas.drawText(LABEL_TOTAL, MARGIN_LEFT, y + 12f, totalLabelPaint)
-        canvas.drawText("₹${String.format("%,d", order.grandTotal.toInt())}", rightX, y + 12f, totalValuePaint)
-        y += 16f + 8f
+        canvas.drawText(LABEL_TOTAL, totalsLabelX, totalsRowY, totalLabelPaint)
+        canvas.drawText("₹${String.format("%,d", order.grandTotal.toInt())}", totalsValueX, totalsRowY, totalValuePaint)
+        totalsRowY += 17f
 
-        // Paid
-        canvas.drawText(LABEL_PAID, MARGIN_LEFT, y + 12f, totalLabelPaint)
-        canvas.drawText("₹${String.format("%,d", totalPaid.toInt())}", rightX, y + 12f, totalValuePaint)
-        y += 16f + 8f
+        canvas.drawText(LABEL_PAID, totalsLabelX, totalsRowY, totalLabelPaint)
+        canvas.drawText("₹${String.format("%,d", totalPaid.toInt())}", totalsValueX, totalsRowY, paidValuePaint)
+        totalsRowY += 19f
 
-        // Balance (highlighted)
-        canvas.drawText(LABEL_BALANCE, MARGIN_LEFT, y + 14f, balanceLabelPaint)
-        canvas.drawText("₹${String.format("%,d", balance.toInt())}", rightX, y + 14f, balanceValuePaint)
-        y += 18f + 16f
+        // Balance row with subtle highlight
+        canvas.drawLine(splitX + 6f, totalsRowY - 13f, rightX - 6f, totalsRowY - 13f, linePaint)
+        canvas.drawText(LABEL_BALANCE, totalsLabelX, totalsRowY, balanceLabelPaint)
+        canvas.drawText("₹${String.format("%,d", balance.toInt())}", totalsValueX, totalsRowY, balanceValuePaint)
 
-        // ══════════════════════════════════════════════════════
-        // FOOTER
-        // ══════════════════════════════════════════════════════
+        // ── Left Side: Note Box ──────────
+        val noteRect = RectF(MARGIN_LEFT, totalsBoxTop, splitX - 12f, totalsBoxTop + 38f)
+        canvas.drawRoundRect(noteRect, 5f, 5f, noteBgPaint)
+        canvas.drawRoundRect(noteRect, 5f, 5f, noteBorderPaint)
 
-        // Separator
-        canvas.drawLine(MARGIN_LEFT, y, rightX, y, linePaint)
-        y += 1f + 16f
+        canvas.drawText(LABEL_NOTE, MARGIN_LEFT + 8f, totalsBoxTop + 14f, noteTitlePaint)
+        val noteLineY = totalsBoxTop + 26f
+        val noteLines = wrapText(NOTE_TEXT, noteTextPaint, (splitX - 12f) - (MARGIN_LEFT + 8f))
+        noteLines.take(2).forEachIndexed { idx, line ->
+            canvas.drawText(line, MARGIN_LEFT + 8f, noteLineY + (idx * 11f), noteTextPaint)
+        }
 
-        // Note
-        canvas.drawText(LABEL_NOTE, MARGIN_LEFT, y + 10f, noteBoldPaint)
-        y += 12f + 4f
-        y = drawWrappedText(canvas, NOTE_TEXT, notePaint, MARGIN_LEFT, y, CONTENT_WIDTH)
-        y += 30f
+        // ── Signatures Area ───────────────
+        val signY = totalsBoxTop + totalsBoxHeight + 28f
 
-        // Signature line
-        val signLineLeft = MARGIN_LEFT + 20f
-        val signLineRight = MARGIN_LEFT + 140f
-        val propLineLeft = rightX - 140f
-        val propLineRight = rightX - 20f
+        // Customer Signature (Left)
+        val custSignStartX = MARGIN_LEFT + 15f
+        val custSignEndX = MARGIN_LEFT + 140f
+        canvas.drawLine(custSignStartX, signY, custSignEndX, signY, linePaint)
+        val custSignCenterX = (custSignStartX + custSignEndX) / 2f
+        canvas.drawText(LABEL_CUSTOMER_SIGN, custSignCenterX, signY + 11f, signLabelPaint)
 
-        canvas.drawLine(signLineLeft, y, signLineRight, y, linePaint)
-        canvas.drawLine(propLineLeft, y, propLineRight, y, linePaint)
-        y += 1f + 8f
-
-        // Signature labels
-        val custSignX = (signLineLeft + signLineRight) / 2f
-        val propSignX = (propLineLeft + propLineRight) / 2f
-        val centeredSignPaint = Paint(signPaint).apply { textAlign = Paint.Align.CENTER }
-        canvas.drawText(LABEL_CUSTOMER_SIGN, custSignX, y + 10f, centeredSignPaint)
-        canvas.drawText(LABEL_PROPRIETOR, propSignX, y + 10f, centeredSignPaint)
+        // Proprietor Signature (Right)
+        val propSignStartX = rightX - 150f
+        val propSignEndX = rightX - 15f
+        canvas.drawLine(propSignStartX, signY, propSignEndX, signY, linePaint)
+        val propSignCenterX = (propSignStartX + propSignEndX) / 2f
+        canvas.drawText(BUSINESS_NAME.takeWhile { it != ',' } + " करिता", propSignCenterX, signY + 11f, signPropLabelPaint)
     }
 
     // ── Drawing Helpers ─────────────────────────────────────
-
-    private fun drawLabelValue(
-        canvas: Canvas,
-        label: String,
-        value: String,
-        x: Float,
-        y: Float,
-        labelPaint: Paint,
-        valuePaint: Paint
-    ) {
-        canvas.drawText(label, x, y + 12f, labelPaint)
-        val labelWidth = labelPaint.measureText(label)
-        canvas.drawText(" $value", x + labelWidth, y + 12f, valuePaint)
-    }
-
-    private fun drawWrappedText(
-        canvas: Canvas,
-        text: String,
-        paint: Paint,
-        x: Float,
-        startY: Float,
-        maxWidth: Float
-    ): Float {
-        val lines = wrapText(text, paint, maxWidth)
-        var y = startY
-        lines.forEach { line ->
-            canvas.drawText(line, x, y + 10f, paint)
-            y += 13f
-        }
-        return y
-    }
-
-    private fun drawWrappedTextCentered(
-        canvas: Canvas,
-        text: String,
-        paint: Paint,
-        centerX: Float,
-        startY: Float,
-        maxWidth: Float
-    ): Float {
-        val measuringPaint = Paint(paint).apply { textAlign = Paint.Align.LEFT }
-        val lines = wrapText(text, measuringPaint, maxWidth)
-        var y = startY
-        lines.forEach { line ->
-            canvas.drawText(line, centerX, y + 10f, paint)
-            y += 12f
-        }
-        return y
-    }
-
-    private fun measureWrappedTextHeight(text: String, paint: Paint, maxWidth: Float): Float {
-        val lines = wrapText(text, paint, maxWidth)
-        return lines.size * 13f
-    }
 
     private fun wrapText(text: String, paint: Paint, maxWidth: Float): List<String> {
         if (maxWidth <= 0f) return listOf(text)

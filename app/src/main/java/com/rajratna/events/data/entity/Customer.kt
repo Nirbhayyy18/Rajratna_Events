@@ -1,10 +1,10 @@
 package com.rajratna.events.data.entity
 
 import com.google.firebase.firestore.DocumentId
+import com.google.firebase.firestore.PropertyName
 
 /**
- * Customer record – stores contact info.
- * Aggregated stats (total orders, amounts) are computed from orders.
+ * Customer record – stores contact info and notebook baseline ledger values.
  * Stored in Firestore "customers" collection.
  */
 data class Customer(
@@ -13,6 +13,12 @@ data class Customer(
     val name: String = "",
     val mobileNumber: String = "",
     val address: String = "",
+    val totalJars: Int = 0,
+    val pendingReturnJars: Int = 0,
+    val pendingAmount: Double = 0.0,
     val createdAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    @get:PropertyName("deleted")
+    @set:PropertyName("deleted")
+    var isDeleted: Boolean = false
 )
+

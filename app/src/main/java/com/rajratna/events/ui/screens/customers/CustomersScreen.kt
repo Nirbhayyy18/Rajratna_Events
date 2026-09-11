@@ -6,8 +6,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.rajratna.events.data.entity.Customer
 import com.rajratna.events.ui.components.*
 import com.rajratna.events.ui.theme.*
 import com.rajratna.events.util.DateUtils
@@ -38,6 +41,7 @@ fun CustomersScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showAddCustomerDialog by remember { mutableStateOf(false) }
+    var editingCustomerWithStats by remember { mutableStateOf<CustomerWithStats?>(null) }
 
     // Show action messages
     LaunchedEffect(state.actionMessage) {
@@ -84,6 +88,7 @@ fun CustomersScreen(
                         CustomerJarCard(
                             cs = cs,
                             onCardClick = { onNavigateToCustomer(cs.customer.id) },
+                            onEdit = { editingCustomerWithStats = cs },
                             onCall = { WhatsAppUtils.callCustomer(context, cs.customer.mobileNumber) },
                             onAddJar = { viewModel.openQuickJar(cs.customer) },
                             onReturnJar = { viewModel.openReturnJar(cs.customer) },
@@ -134,14 +139,42 @@ fun CustomersScreen(
     }
 
     if (showAddCustomerDialog) {
-        AddCustomerDialog(
+        CustomerFormDialog(
+            title = "Add New Customer",
             onDismiss = { showAddCustomerDialog = false },
-            onConfirm = { name, mobile, address ->
+            onConfirm = { name, mobile, address, totalJars, pendingReturns, pendingAmount ->
                 viewModel.addCustomer(
                     name = name,
                     mobileNumber = mobile,
                     address = address,
+                    totalJars = totalJars,
+                    pendingReturnJars = pendingReturns,
+                    pendingAmount = pendingAmount,
                     onSuccess = { showAddCustomerDialog = false },
+                    onError = { error -> Toast.makeText(context, error, Toast.LENGTH_SHORT).show() }
+                )
+            }
+        )
+    }
+
+    if (editingCustomerWithStats != null) {
+        val target = editingCustomerWithStats!!
+        CustomerFormDialog(
+            title = "Edit Customer",
+            initialCustomer = target.customer,
+            initialPendingReturns = target.jarStats.pendingReturnJars,
+            initialPendingAmount = target.jarStats.pendingBalance,
+            onDismiss = { editingCustomerWithStats = null },
+            onConfirm = { name, mobile, address, totalJars, pendingReturns, pendingAmount ->
+                viewModel.updateCustomer(
+                    customer = target.customer,
+                    name = name,
+                    mobileNumber = mobile,
+                    address = address,
+                    totalJars = totalJars,
+                    pendingReturnJars = pendingReturns,
+                    pendingAmount = pendingAmount,
+                    onSuccess = { editingCustomerWithStats = null },
                     onError = { error -> Toast.makeText(context, error, Toast.LENGTH_SHORT).show() }
                 )
             }
@@ -157,6 +190,7 @@ fun CustomersScreen(
 private fun CustomerJarCard(
     cs: CustomerWithStats,
     onCardClick: () -> Unit,
+    onEdit: () -> Unit,
     onCall: () -> Unit,
     onAddJar: () -> Unit,
     onReturnJar: () -> Unit,
@@ -181,7 +215,7 @@ private fun CustomerJarCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(Modifier.padding(16.dp)) {
-            // Header: Avatar + Name + Call button
+            // Header: Avatar + Name + Edit + Call buttons
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -197,18 +231,29 @@ private fun CustomerJarCard(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            cs.customer.mobileNumber,
+                            if (cs.customer.mobileNumber.isNotBlank()) cs.customer.mobileNumber else "Walk-in Customer",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                FilledTonalIconButton(
-                    onClick = onCall,
-                    modifier = Modifier.size(38.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = StatusConfirmedBg)
-                ) {
-                    Icon(Icons.Default.Call, "Call", tint = StatusConfirmed, modifier = Modifier.size(18.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    FilledTonalIconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(38.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                    ) {
+                        Icon(Icons.Default.Edit, "Edit Customer", tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(18.dp))
+                    }
+                    if (cs.customer.mobileNumber.isNotBlank()) {
+                        FilledTonalIconButton(
+                            onClick = onCall,
+                            modifier = Modifier.size(38.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = StatusConfirmedBg)
+                        ) {
+                            Icon(Icons.Default.Call, "Call", tint = StatusConfirmed, modifier = Modifier.size(18.dp))
+                        }
+                    }
                 }
             }
 
@@ -359,33 +404,52 @@ private fun JarStatRow(
 // ═══════════════════════════════════════════════════════════
 
 @Composable
-private fun AddCustomerDialog(
+private fun CustomerFormDialog(
+    title: String = "Add New Customer",
+    initialCustomer: Customer? = null,
+    initialPendingReturns: Int = 0,
+    initialPendingAmount: Double = 0.0,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, mobileNumber: String, address: String) -> Unit
+    onConfirm: (name: String, mobile: String, address: String, totalJars: Int, pendingReturns: Int, pendingAmount: Double) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var mobile by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(initialCustomer?.name ?: "") }
+    var mobile by remember { mutableStateOf(initialCustomer?.mobileNumber ?: "") }
+    var address by remember { mutableStateOf(initialCustomer?.address ?: "") }
+    var totalJars by remember {
+        val count = initialCustomer?.totalJars ?: 0
+        mutableStateOf(if (count > 0) count.toString() else "")
+    }
+    var pendingReturns by remember {
+        val count = if (initialPendingReturns > 0) initialPendingReturns else (initialCustomer?.pendingReturnJars ?: 0)
+        mutableStateOf(if (count > 0) count.toString() else "")
+    }
+    var pendingAmount by remember {
+        val amt = if (initialPendingAmount > 0) initialPendingAmount else (initialCustomer?.pendingAmount ?: 0.0)
+        mutableStateOf(if (amt > 0) amt.toInt().toString() else "")
+    }
+
     var nameError by remember { mutableStateOf<String?>(null) }
     var mobileError by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Default.PersonAdd, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text("Add New Customer", fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(
+                    if (initialCustomer == null) Icons.Default.PersonAdd else Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(title, fontWeight = FontWeight.Bold)
             }
         },
         text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(
                     value = name,
@@ -407,12 +471,12 @@ private fun AddCustomerDialog(
                     onValueChange = { input ->
                         if (input.all { it.isDigit() } && input.length <= 10) {
                             mobile = input
-                            if (input.length == 10) mobileError = null
+                            if (input.isEmpty() || input.length == 10) mobileError = null
                         }
                     },
-                    label = { Text("Mobile Number *") },
-                    placeholder = { Text("10-digit mobile number") },
-                    prefix = { Text("+91 ") },
+                    label = { Text("Mobile Number (optional)") },
+                    placeholder = { Text("10 digits or leave blank for walk-in") },
+                    prefix = { if (mobile.isNotBlank()) Text("+91 ") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     isError = mobileError != null,
@@ -424,10 +488,54 @@ private fun AddCustomerDialog(
                 OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
-                    label = { Text("Address / Village / Note (Optional)") },
+                    label = { Text("Address / Village (Optional)") },
                     placeholder = { Text("e.g. Andrud, Phaltan") },
-                    minLines = 2,
-                    maxLines = 3,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Text(
+                    text = "Notebook / Ledger Setup (जुनी वही नोंद)",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = totalJars,
+                        onValueChange = { if (it.all { c -> c.isDigit() }) totalJars = it },
+                        label = { Text("Total Jars") },
+                        placeholder = { Text("e.g. 50") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    OutlinedTextField(
+                        value = pendingReturns,
+                        onValueChange = { if (it.all { c -> c.isDigit() }) pendingReturns = it },
+                        label = { Text("Pending Jars") },
+                        placeholder = { Text("e.g. 10") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = pendingAmount,
+                    onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) pendingAmount = it },
+                    label = { Text("Pending Balance / बाकी रक्कम (₹)") },
+                    placeholder = { Text("e.g. 250") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -436,22 +544,22 @@ private fun AddCustomerDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    var hasError = false
                     if (name.isBlank()) {
                         nameError = "Name is required"
-                        hasError = true
+                        return@Button
                     }
-                    if (mobile.isBlank() || mobile.length < 10) {
-                        mobileError = "Valid 10-digit mobile number required"
-                        hasError = true
+                    if (mobile.isNotBlank() && mobile.length < 10) {
+                        mobileError = "Valid 10-digit number or leave blank"
+                        return@Button
                     }
-                    if (!hasError) {
-                        onConfirm(name, mobile, address)
-                    }
+                    val tj = totalJars.toIntOrNull() ?: 0
+                    val pr = pendingReturns.toIntOrNull() ?: 0
+                    val pa = pendingAmount.toDoubleOrNull() ?: 0.0
+                    onConfirm(name, mobile, address, tj, pr, pa)
                 },
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Save Customer")
+                Text(if (initialCustomer == null) "Save Customer" else "Update Customer")
             }
         },
         dismissButton = {

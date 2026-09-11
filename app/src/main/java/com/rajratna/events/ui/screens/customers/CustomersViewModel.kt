@@ -63,7 +63,7 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
                     val activeOrders = custOrders.filter { it.orderStatus != OrderStatus.CANCELLED }
                     val totalOrders = custOrders.size
                     val totalAmount = activeOrders.sumOf { it.grandTotal }
-                    val pendingBalance = activeOrders.sumOf { it.balanceAmount }
+                    val pendingBalance = customer.pendingAmount + activeOrders.sumOf { it.balanceAmount }
                     val totalPaid = totalAmount - pendingBalance
 
                     val monthOrders = activeOrders.filter { it.deliveryDate in monthStart until monthEnd }
@@ -77,7 +77,7 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
                         }
                     }
 
-                    var pendingReturnJars = 0
+                    var pendingReturnJars = customer.pendingReturnJars
                     for (order in activeOrders) {
                         if (order.orderStatus in listOf(OrderStatus.CONFIRMED, OrderStatus.DELIVERED)) {
                             val items = jarItemsByOrder[order.id] ?: emptyList()
@@ -260,6 +260,9 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
         name: String,
         mobileNumber: String,
         address: String,
+        totalJars: Int = 0,
+        pendingReturnJars: Int = 0,
+        pendingAmount: Double = 0.0,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -271,23 +274,28 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
             onError("Customer name is required")
             return
         }
-        if (trimmedMobile.isBlank() || trimmedMobile.length < 10) {
-            onError("Valid 10-digit mobile number is required")
+        if (trimmedMobile.isNotBlank() && trimmedMobile.length < 10) {
+            onError("Please enter a valid 10-digit mobile number or leave blank")
             return
         }
 
         viewModelScope.launch {
             try {
-                val existing = repository.getCustomerByMobile(trimmedMobile)
-                if (existing != null) {
-                    onError("Customer with mobile $trimmedMobile already exists: ${existing.name}")
-                    return@launch
+                if (trimmedMobile.isNotBlank()) {
+                    val existing = repository.getCustomerByMobile(trimmedMobile)
+                    if (existing != null) {
+                        onError("Customer with mobile $trimmedMobile already exists: ${existing.name}")
+                        return@launch
+                    }
                 }
                 repository.insertCustomer(
                     Customer(
                         name = trimmedName,
                         mobileNumber = trimmedMobile,
-                        address = trimmedAddress
+                        address = trimmedAddress,
+                        totalJars = totalJars,
+                        pendingReturnJars = pendingReturnJars,
+                        pendingAmount = pendingAmount
                     )
                 )
                 _state.value = _state.value.copy(actionMessage = "Customer $trimmedName added successfully")
@@ -295,6 +303,50 @@ class CustomersViewModel(application: Application) : AndroidViewModel(applicatio
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.message ?: "Failed to add customer")
+            }
+        }
+    }
+
+    fun updateCustomer(
+        customer: Customer,
+        name: String,
+        mobileNumber: String,
+        address: String,
+        totalJars: Int,
+        pendingReturnJars: Int,
+        pendingAmount: Double,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val trimmedName = name.trim()
+        val trimmedMobile = mobileNumber.trim()
+        val trimmedAddress = address.trim()
+
+        if (trimmedName.isBlank()) {
+            onError("Customer name is required")
+            return
+        }
+        if (trimmedMobile.isNotBlank() && trimmedMobile.length < 10) {
+            onError("Please enter a valid 10-digit mobile number or leave blank")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val updated = customer.copy(
+                    name = trimmedName,
+                    mobileNumber = trimmedMobile,
+                    address = trimmedAddress,
+                    totalJars = totalJars,
+                    pendingReturnJars = pendingReturnJars,
+                    pendingAmount = pendingAmount
+                )
+                repository.updateCustomer(updated)
+                _state.value = _state.value.copy(actionMessage = "Customer $trimmedName updated successfully")
+                loadCustomers()
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.message ?: "Failed to update customer")
             }
         }
     }
