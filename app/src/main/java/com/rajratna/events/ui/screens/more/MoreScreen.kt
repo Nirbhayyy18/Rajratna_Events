@@ -19,16 +19,18 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoreScreen(
+    onNavigateToInventory: () -> Unit,
     onNavigateToCustomers: () -> Unit,
     onNavigateToPayments: () -> Unit,
     onNavigateToReports: () -> Unit,
     onNavigateToBackup: () -> Unit
 ) {
     val menuItems = listOf(
-        MoreMenuItem("Customers", "View and manage customers", Icons.Outlined.People, onNavigateToCustomers),
-        MoreMenuItem("Payments", "View payment history", Icons.Outlined.Payment, onNavigateToPayments),
+        MoreMenuItem("Inventory & Rates", "Manage stock, items, and rental rates", Icons.Outlined.Inventory2, onNavigateToInventory),
+       // MoreMenuItem("Customers", "View and manage customer khata & jars", Icons.Outlined.People, onNavigateToCustomers),
+        MoreMenuItem("Payments", "View payment history & collections", Icons.Outlined.Payment, onNavigateToPayments),
         MoreMenuItem("Reports", "Income and expense reports", Icons.Outlined.Assessment, onNavigateToReports),
-        MoreMenuItem("Backup & Restore", "Export or import app data", Icons.Outlined.Backup, onNavigateToBackup)
+        MoreMenuItem("Backup & Restore", "Cloud sync and export app data", Icons.Outlined.Backup, onNavigateToBackup)
     )
 
     Scaffold(

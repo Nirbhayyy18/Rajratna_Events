@@ -268,7 +268,7 @@ private fun CustomerJarCard(
                 Column {
                     JarStatRow(
                         icon = Icons.Default.WaterDrop,
-                        label = "This Month",
+                        label = "Total Jars",
                         value = "${jarStats.thisMonthJarCount} jars",
                         color = Teal40
                     )
@@ -567,6 +567,7 @@ private fun CustomerFormDialog(
                     val pa = pendingAmount.toDoubleOrNull() ?: 0.0
                     onConfirm(name, mobile, address, tj, pr, pa)
                 },
+
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(if (initialCustomer == null) "Save Customer" else "Update Customer")

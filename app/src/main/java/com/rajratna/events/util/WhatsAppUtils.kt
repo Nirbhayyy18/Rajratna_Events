@@ -18,32 +18,41 @@ object WhatsAppUtils {
      */
     fun generateBillMessage(order: Order, items: List<OrderItem>): String {
         val sb = StringBuilder()
-        sb.appendLine("Bill No: ${order.billNumber}")
-        sb.appendLine()
-        sb.appendLine("Customer: ${order.customerName}")
-        sb.appendLine("Mobile: ${order.customerMobile}")
-        sb.appendLine()
-        sb.appendLine("Order Date: ${DateUtils.formatDate(order.orderDate)}")
-        sb.appendLine("Delivery Date: ${DateUtils.formatDate(order.deliveryDate)}")
-        sb.appendLine("Return Date: ${DateUtils.formatDate(order.returnDate)}")
-        sb.appendLine("Rental Days: ${order.rentalDays}")
-        sb.appendLine()
-        sb.appendLine("Items:")
+        sb.appendLine("॥ श्री ॥")
+        sb.appendLine("*राजरत्न इव्हेंट्स अँड वॉटर सप्लायर्स*")
+        sb.appendLine("अंद्रुड, ता. फलटण, जि. सातारा")
+        sb.appendLine("मो. 9922676759 / 9011929394")
+        sb.appendLine("──────────────────────")
+        sb.appendLine("*बिल पावती क्र.:* ${order.billNumber}")
+        sb.appendLine("*ग्राहक:* ${order.customerName}")
+        if (order.customerMobile.isNotBlank()) {
+            sb.appendLine("*मोबाईल:* ${order.customerMobile}")
+        }
+        sb.appendLine("*ऑर्डर दिनांक:* ${DateUtils.formatDate(order.orderDate)}")
+        sb.appendLine("*पोहोच दिनांक:* ${DateUtils.formatDate(order.deliveryDate)}")
+        sb.appendLine("*परत दिनांक:* ${DateUtils.formatDate(order.returnDate)}")
+        sb.appendLine("*भाडे दिवस:* ${order.rentalDays}")
+        sb.appendLine("──────────────────────")
+        sb.appendLine("*साहित्य तपशील:*")
 
         items.forEach { item ->
-            val suffix = if (item.isCustomerOwned) " (Customer Jar)" else ""
-            sb.appendLine("${item.itemName}$suffix: ${item.quantity} x ${item.ratePerDay.toInt()} x ${item.rentalDays} days = ${item.totalAmount.toInt()}")
+            val suffix = if (item.isCustomerOwned) " (स्वतःचा जार)" else ""
+            sb.appendLine("• ${item.itemName}$suffix: ${item.quantity} नग x ₹${item.ratePerDay.toInt()} x ${item.rentalDays} दिवस = ₹${item.totalAmount.toInt()}")
         }
 
-        sb.appendLine()
-        sb.appendLine("Items Total: ${order.itemsTotal.toInt()} rs")
+        sb.appendLine("──────────────────────")
+        sb.appendLine("*एकूण भाडे:* ₹${order.itemsTotal.toInt()}")
         if (order.transportRent > 0) {
-            sb.appendLine("Transport Rent: ${order.transportRent.toInt()} rs")
+            sb.appendLine("*वाहतूक भाडे:* ₹${order.transportRent.toInt()}")
         }
-        sb.appendLine("Grand Total: ${order.grandTotal.toInt()} rs")
-        sb.appendLine()
-        sb.appendLine("Paid: ${(order.grandTotal - order.balanceAmount).toInt()} rs")
-        sb.appendLine("Balance: ${order.balanceAmount.toInt()} rs")
+        if (order.discountAmount > 0) {
+            sb.appendLine("*सूट:* ₹${order.discountAmount.toInt()}")
+        }
+        sb.appendLine("*एकूण देय रक्कम:* ₹${order.grandTotal.toInt()}")
+        sb.appendLine("*जमा रक्कम:* ₹${(order.grandTotal - order.balanceAmount).toInt()}")
+        sb.appendLine("*उर्वरित बाकी:* ₹${order.balanceAmount.toInt()}")
+        sb.appendLine("──────────────────────")
+        sb.appendLine("धन्यवाद! पुन्हा सेवेची संधी द्यावी.")
 
         return sb.toString()
     }
@@ -53,11 +62,17 @@ object WhatsAppUtils {
      */
     fun generatePaymentReminder(order: Order): String {
         return """
-Hello ${order.customerName},
+॥ श्री ॥
+*राजरत्न इव्हेंट्स अँड वॉटर सप्लायर्स*
+अंद्रुड, ता. फलटण, जि. सातारा
+मो. 9922676759 / 9011929394
+──────────────────────
+सस्नेह नमस्कार *${order.customerName}* जी,
 
-Your pending balance for Bill No. ${order.billNumber} is ${order.balanceAmount.toInt()} rs.
+आपल्या बिल पावती क्र. *${order.billNumber}* ची शिल्लक बाकी रक्कम *₹${order.balanceAmount.toInt()}* येणे बाकी आहे.
 
-Please make payment when possible.
+कृपया आपल्या सोयीनुसार रक्कम जमा करावी ही नम्र विनंती.
+धन्यवाद!
         """.trimIndent()
     }
 
@@ -66,15 +81,23 @@ Please make payment when possible.
      */
     fun generateOrderConfirmation(order: Order): String {
         return """
-Hello ${order.customerName},
+॥ श्री ॥
+*राजरत्न इव्हेंट्स अँड वॉटर सप्लायर्स*
+अंद्रुड, ता. फलटण, जि. सातारा
+मो. 9922676759 / 9011929394
+──────────────────────
+सस्नेह नमस्कार *${order.customerName}* जी,
 
-Your order has been confirmed.
+आपली ऑर्डर यशस्वीरीत्या नोंदवण्यात आली आहे.
 
-Bill No: ${order.billNumber}
-Delivery Date: ${DateUtils.formatDate(order.deliveryDate)}
-Return Date: ${DateUtils.formatDate(order.returnDate)}
-Grand Total: ${order.grandTotal.toInt()} rs
-Balance: ${order.balanceAmount.toInt()} rs
+*बिल पावती क्र.:* ${order.billNumber}
+*पोहोच दिनांक:* ${DateUtils.formatDate(order.deliveryDate)}
+*परत दिनांक:* ${DateUtils.formatDate(order.returnDate)}
+*एकूण देय रक्कम:* ₹${order.grandTotal.toInt()}
+*ऍडव्हान्स जमा:* ₹${order.advancePaid.toInt()}
+*उर्वरित बाकी:* ₹${order.balanceAmount.toInt()}
+──────────────────────
+धन्यवाद! राजरत्न इव्हेंट्स सदैव आपल्या सेवेत.
         """.trimIndent()
     }
 
@@ -83,21 +106,25 @@ Balance: ${order.balanceAmount.toInt()} rs
      */
     fun generateReturnReminder(order: Order, pendingItems: List<OrderItem>): String {
         val sb = StringBuilder()
-        sb.appendLine("Hello ${order.customerName},")
+        sb.appendLine("॥ श्री ॥")
+        sb.appendLine("*राजरत्न इव्हेंट्स अँड वॉटर सप्लायर्स*")
+        sb.appendLine("मो. 9922676759 / 9011929394")
+        sb.appendLine("──────────────────────")
+        sb.appendLine("सस्नेह नमस्कार *${order.customerName}* जी,")
         sb.appendLine()
-        sb.appendLine("Your rented items for Bill No. ${order.billNumber} are pending return.")
+        sb.appendLine("आपल्या बिल पावती क्र. *${order.billNumber}* मधील खालील साहित्य परत जमा करणे बाकी आहे:")
         sb.appendLine()
-        sb.appendLine("Pending items:")
         pendingItems.forEach { item ->
             val pending = item.quantity - item.returnedQuantity - item.damagedQuantity
             if (pending > 0) {
-                sb.appendLine("${item.itemName}: $pending")
+                sb.appendLine("• *${item.itemName}:* $pending नग")
             }
         }
         sb.appendLine()
-        sb.appendLine("Return Date: ${DateUtils.formatDate(order.returnDate)}")
+        sb.appendLine("*नियोजित परत दिनांक:* ${DateUtils.formatDate(order.returnDate)}")
         sb.appendLine()
-        sb.appendLine("Please return the items as soon as possible.")
+        sb.appendLine("कृपया साहित्य लवकरात लवकर जमा करावे ही नम्र विनंती.")
+        sb.appendLine("धन्यवाद!")
 
         return sb.toString()
     }
@@ -200,21 +227,27 @@ Balance: ${order.balanceAmount.toInt()} rs
         advanceBalance: Double = 0.0
     ): String {
         val sb = StringBuilder()
-        sb.appendLine("Rajratna Events")
-        sb.appendLine()
-        sb.appendLine(customerName)
-        sb.appendLine("This Month Jar Summary")
-        sb.appendLine()
-        sb.appendLine("Total Jars: $thisMonthJarCount")
-        sb.appendLine("Total Amount: ₹${thisMonthJarAmount.toInt()}")
-        sb.appendLine("Paid: ₹${paidAmount.toInt()}")
-        sb.appendLine("Balance: ₹${pendingBalance.toInt()}")
+        sb.appendLine("॥ श्री ॥")
+        sb.appendLine("*राजरत्न वॉटर सप्लायर्स*")
+        sb.appendLine("अंद्रुड, ता. फलटण, जि. सातारा")
+        sb.appendLine("मो. 9922676759 / 9011929394")
+        sb.appendLine("──────────────────────")
+        sb.appendLine("*चालू महिन्याचा पाणी जार हिशोब*")
+        sb.appendLine("ग्राहक: *$customerName*")
+        sb.appendLine("──────────────────────")
+        sb.appendLine("• एकूण घेतलेले जार: *$thisMonthJarCount नग*")
+        sb.appendLine("• एकूण बिल रक्कम: *₹${thisMonthJarAmount.toInt()}*")
+        sb.appendLine("• जमा रक्कम: *₹${paidAmount.toInt()}*")
+        sb.appendLine("• उर्वरित बाकी: *₹${pendingBalance.toInt()}*")
         if (advanceBalance > 0) {
-            sb.appendLine("Advance Credit: ₹${advanceBalance.toInt()}")
+            sb.appendLine("• जादा जमा (Advance): *₹${advanceBalance.toInt()}*")
         }
         if (pendingReturnJars > 0) {
-            sb.appendLine("Pending Return: $pendingReturnJars jars")
+            sb.appendLine("• रिकामे जार परत येणे बाकी: *$pendingReturnJars जार*")
         }
+        sb.appendLine("──────────────────────")
+        sb.appendLine("काही शंका असल्यास संपर्क साधावा.")
+        sb.appendLine("धन्यवाद!")
         return sb.toString()
     }
 }

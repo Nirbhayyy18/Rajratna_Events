@@ -45,7 +45,8 @@ data class ReturnEntry(
     val givenQuantity: Int,
     val alreadyReturned: Int,
     val pendingQuantity: Int,
-    val returnedNow: Int = 0
+    val returnedNow: Int = 0,
+    val damagedNow: Int = 0
 )
 
 enum class PendingFilter { ALL, DUE_TODAY, OVERDUE, UPCOMING }
@@ -224,7 +225,18 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
     fun updateReturnedNow(orderItemId: String, value: Int) {
         val entries = _state.value.returnEntries.map { entry ->
             if (entry.orderItemId == orderItemId) {
-                entry.copy(returnedNow = value.coerceIn(0, entry.pendingQuantity))
+                val maxAllowed = entry.pendingQuantity - entry.damagedNow
+                entry.copy(returnedNow = value.coerceIn(0, maxOf(0, maxAllowed)))
+            } else entry
+        }
+        _state.value = _state.value.copy(returnEntries = entries)
+    }
+
+    fun updateDamagedNow(orderItemId: String, value: Int) {
+        val entries = _state.value.returnEntries.map { entry ->
+            if (entry.orderItemId == orderItemId) {
+                val maxAllowed = entry.pendingQuantity - entry.returnedNow
+                entry.copy(damagedNow = value.coerceIn(0, maxOf(0, maxAllowed)))
             } else entry
         }
         _state.value = _state.value.copy(returnEntries = entries)
@@ -232,7 +244,7 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
 
     fun markAllReturned() {
         val entries = _state.value.returnEntries.map { entry ->
-            entry.copy(returnedNow = entry.pendingQuantity)
+            entry.copy(returnedNow = entry.pendingQuantity, damagedNow = 0)
         }
         _state.value = _state.value.copy(returnEntries = entries)
     }
@@ -245,8 +257,16 @@ class ReturnsViewModel(application: Application) : AndroidViewModel(application)
                 .filter { it.returnedNow > 0 }
                 .associate { it.orderItemId to it.returnedNow }
 
-            if (returnMap.isNotEmpty()) {
-                repository.recordReturn(_state.value.recordReturnOrderId, returnMap)
+            val damagedMap = _state.value.returnEntries
+                .filter { it.damagedNow > 0 }
+                .associate { it.orderItemId to it.damagedNow }
+
+            if (returnMap.isNotEmpty() || damagedMap.isNotEmpty()) {
+                repository.recordReturnWithDamaged(
+                    _state.value.recordReturnOrderId,
+                    returnMap,
+                    damagedMap
+                )
             }
 
             _state.value = _state.value.copy(isSaving = false)

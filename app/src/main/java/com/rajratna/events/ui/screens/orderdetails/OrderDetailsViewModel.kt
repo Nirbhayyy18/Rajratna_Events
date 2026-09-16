@@ -81,9 +81,13 @@ class OrderDetailsViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    fun recordReturn(returnEntries: Map<String, Int>, onSuccess: () -> Unit) {
+    fun recordReturn(
+        returnEntries: Map<String, Int>,
+        damagedEntries: Map<String, Int> = emptyMap(),
+        onSuccess: () -> Unit
+    ) {
         viewModelScope.launch {
-            repository.recordReturn(currentOrderId, returnEntries)
+            repository.recordReturnWithDamaged(currentOrderId, returnEntries, damagedEntries)
             onSuccess()
         }
     }

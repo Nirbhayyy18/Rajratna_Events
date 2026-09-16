@@ -116,6 +116,7 @@ fun ReturnsScreen(
             entries = state.returnEntries,
             isSaving = state.isSaving,
             onUpdateReturnedNow = { id, value -> viewModel.updateReturnedNow(id, value) },
+            onUpdateDamagedNow = { id, value -> viewModel.updateDamagedNow(id, value) },
             onMarkAllReturned = { viewModel.markAllReturned() },
             onSave = {
                 viewModel.saveReturn {
@@ -589,6 +590,7 @@ private fun RecordReturnSheet(
     entries: List<ReturnEntry>,
     isSaving: Boolean,
     onUpdateReturnedNow: (String, Int) -> Unit,
+    onUpdateDamagedNow: (String, Int) -> Unit,
     onMarkAllReturned: () -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit
@@ -608,7 +610,7 @@ private fun RecordReturnSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Record Return",
+                text = "Record Return / साहित्य जमा",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -616,7 +618,8 @@ private fun RecordReturnSheet(
             entries.forEach { entry ->
                 ReturnEntryRow(
                     entry = entry,
-                    onValueChange = { onUpdateReturnedNow(entry.orderItemId, it) }
+                    onReturnedChange = { onUpdateReturnedNow(entry.orderItemId, it) },
+                    onDamagedChange = { onUpdateDamagedNow(entry.orderItemId, it) }
                 )
             }
 
@@ -636,7 +639,7 @@ private fun RecordReturnSheet(
                     onClick = onSave,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    enabled = !isSaving && entries.any { it.returnedNow > 0 }
+                    enabled = !isSaving && entries.any { it.returnedNow > 0 || it.damagedNow > 0 }
                 ) {
                     if (isSaving) {
                         CircularProgressIndicator(
@@ -663,7 +666,8 @@ private fun RecordReturnSheet(
 @Composable
 private fun ReturnEntryRow(
     entry: ReturnEntry,
-    onValueChange: (Int) -> Unit
+    onReturnedChange: (Int) -> Unit,
+    onDamagedChange: (Int) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -672,7 +676,7 @@ private fun ReturnEntryRow(
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = entry.itemName,
@@ -687,13 +691,15 @@ private fun ReturnEntryRow(
                 InfoChip("Returned", entry.alreadyReturned.toString())
                 InfoChip("Pending", entry.pendingQuantity.toString())
             }
+
+            // Returned Good
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Returned Now:",
+                    text = "Returned (चांगले):",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
@@ -702,13 +708,46 @@ private fun ReturnEntryRow(
                     value = if (entry.returnedNow == 0) "" else entry.returnedNow.toString(),
                     onValueChange = { text ->
                         val value = text.toIntOrNull() ?: 0
-                        onValueChange(value.coerceIn(0, entry.pendingQuantity))
+                        val maxAllowed = maxOf(0, entry.pendingQuantity - entry.damagedNow)
+                        onReturnedChange(value.coerceIn(0, maxAllowed))
                     },
-                    modifier = Modifier.width(100.dp),
+                    modifier = Modifier.width(90.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
                     textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    placeholder = { Text("0") }
+                )
+            }
+
+            // Damaged / Broken
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Damaged (खराब/फुटलेले):",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = if (entry.damagedNow == 0) "" else entry.damagedNow.toString(),
+                    onValueChange = { text ->
+                        val value = text.toIntOrNull() ?: 0
+                        val maxAllowed = maxOf(0, entry.pendingQuantity - entry.returnedNow)
+                        onDamagedChange(value.coerceIn(0, maxAllowed))
+                    },
+                    modifier = Modifier.width(90.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    ),
                     placeholder = { Text("0") }
                 )
             }

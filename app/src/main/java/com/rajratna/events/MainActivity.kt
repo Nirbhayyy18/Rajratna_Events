@@ -71,16 +71,16 @@ data class BottomNavItem(
 val topLevelRoutes = listOf(
     Screen.Dashboard.route,
     Screen.OrdersList.route,
+    Screen.Customers.route,
     Screen.Returns.route,
-    Screen.ItemsRates.route,
     Screen.More.route
 )
 
 val bottomNavItems = listOf(
     BottomNavItem("Home",      Screen.Dashboard.route,  Icons.Filled.Home,             Icons.Outlined.Home),
     BottomNavItem("Orders",    Screen.OrdersList.route, Icons.Filled.Receipt,           Icons.Outlined.Receipt),
+    BottomNavItem("Customer", Screen.Customers.route,  Icons.Filled.People,            Icons.Outlined.People),
     BottomNavItem("Returns",   Screen.Returns.route,    Icons.Filled.AssignmentReturn,  Icons.Outlined.AssignmentReturn),
-    BottomNavItem("Inventory", Screen.ItemsRates.route, Icons.Filled.Inventory2,        Icons.Outlined.Inventory2),
     BottomNavItem("More",      Screen.More.route,       Icons.Filled.MoreHoriz,         Icons.Outlined.MoreHoriz)
 )
 

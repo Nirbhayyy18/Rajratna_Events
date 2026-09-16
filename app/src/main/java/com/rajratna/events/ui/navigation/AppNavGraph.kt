@@ -188,6 +188,7 @@ fun AppNavGraph(
         // More
         composable(Screen.More.route) {
             MoreScreen(
+                onNavigateToInventory = { navController.navigate(Screen.ItemsRates.route) },
                 onNavigateToCustomers = { navController.navigate(Screen.Customers.route) },
                 onNavigateToPayments  = { navController.navigate(Screen.Payments.route) },
                 onNavigateToReports   = { navController.navigate(Screen.Reports.route) },

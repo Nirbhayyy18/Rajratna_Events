@@ -93,9 +93,9 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToCustomers) {
-                        Icon(Icons.Default.People, contentDescription = "Customers")
-                    }
+//                    IconButton(onClick = onNavigateToCustomers) {
+//                        Icon(Icons.Default.People, contentDescription = "Customers")
+//                    }
                     ThemeToggleButton(
                         currentMode  = currentTheme,
                         onCycleTheme = onCycleTheme

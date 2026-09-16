@@ -1459,14 +1459,41 @@ class AppRepository(
             totalPaid > 0 -> PaymentStatusType.PARTIALLY_PAID
             else -> PaymentStatusType.UNPAID
         }
+        val balance = maxOf(0.0, order.grandTotal - totalPaid)
+        val effectiveAdvance = minOf(totalPaid, order.grandTotal)
+
         ordersCol.document(orderId).update(
             mapOf(
-                "balanceAmount" to (order.grandTotal - totalPaid),
+                "balanceAmount" to balance,
                 "paymentStatus" to newPaymentStatus,
-                "advancePaid" to totalPaid,
+                "advancePaid" to effectiveAdvance,
                 "updatedAt" to System.currentTimeMillis()
             )
         ).await()
+
+        // If excess was paid beyond order grandTotal, credit customer ledger
+        val previousTotalPaid = maxOf(0.0, totalPaid - payment.amount)
+        val balanceBeforeThisPayment = maxOf(0.0, order.grandTotal - previousTotalPaid)
+        var excess = maxOf(0.0, payment.amount - balanceBeforeThisPayment)
+
+        if (excess > 0.0 && order.customerId.isNotBlank()) {
+            val customer = getCustomerById(order.customerId)
+            if (customer != null) {
+                var currentCustomer = customer
+                // Deduct from baseline pendingAmount if any exists
+                if (excess > 0.0 && currentCustomer.pendingAmount > 0.0) {
+                    val deductFromBaseline = minOf(excess, currentCustomer.pendingAmount)
+                    val newBaseline = maxOf(0.0, currentCustomer.pendingAmount - deductFromBaseline)
+                    currentCustomer = currentCustomer.copy(pendingAmount = newBaseline)
+                    excess -= deductFromBaseline
+                }
+                // Add remainder to advance credit (जमा)
+                if (excess > 0.0) {
+                    currentCustomer = currentCustomer.copy(advanceBalance = currentCustomer.advanceBalance + excess)
+                }
+                updateCustomer(currentCustomer)
+            }
+        }
     }
 
     // ══════════════════════════════════════════════════════════

@@ -502,12 +502,13 @@ fun OrderDetailsScreen(
                                     Text("Pending: ${entry.pendingQuantity}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                                 }
                                 Spacer(Modifier.height(8.dp))
+                                // Returned Good
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("Returned Now:", style = MaterialTheme.typography.bodyMedium)
+                                    Text("Returned (चांगले):", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                                     
                                     IconButton(
                                         onClick = {
@@ -526,14 +527,64 @@ fun OrderDetailsScreen(
                                         text = entry.returnedNow.toString(),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                        modifier = Modifier.padding(horizontal = 4.dp)
                                     )
                                     
                                     IconButton(
                                         onClick = {
                                             returnEntries = returnEntries.map { e ->
                                                 if (e.orderItemId == entry.orderItemId) {
-                                                    e.copy(returnedNow = minOf(e.pendingQuantity, e.returnedNow + 1))
+                                                    val maxAllowed = maxOf(0, e.pendingQuantity - e.damagedNow)
+                                                    e.copy(returnedNow = minOf(maxAllowed, e.returnedNow + 1))
+                                                } else e
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, null)
+                                    }
+                                }
+
+                                // Damaged
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        "Damaged (खराब):",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    
+                                    IconButton(
+                                        onClick = {
+                                            returnEntries = returnEntries.map { e ->
+                                                if (e.orderItemId == entry.orderItemId) {
+                                                    e.copy(damagedNow = maxOf(0, e.damagedNow - 1))
+                                                } else e
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Remove, null)
+                                    }
+                                    
+                                    Text(
+                                        text = entry.damagedNow.toString(),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.padding(horizontal = 4.dp)
+                                    )
+                                    
+                                    IconButton(
+                                        onClick = {
+                                            returnEntries = returnEntries.map { e ->
+                                                if (e.orderItemId == entry.orderItemId) {
+                                                    val maxAllowed = maxOf(0, e.pendingQuantity - e.returnedNow)
+                                                    e.copy(damagedNow = minOf(maxAllowed, e.damagedNow + 1))
                                                 } else e
                                             }
                                         },
@@ -555,7 +606,7 @@ fun OrderDetailsScreen(
                     TextButton(
                         onClick = {
                             returnEntries = returnEntries.map { e ->
-                                e.copy(returnedNow = e.pendingQuantity)
+                                e.copy(returnedNow = e.pendingQuantity, damagedNow = 0)
                             }
                         }
                     ) {
@@ -566,15 +617,18 @@ fun OrderDetailsScreen(
                             val returnMap = returnEntries
                                 .filter { it.returnedNow > 0 }
                                 .associate { it.orderItemId to it.returnedNow }
+                            val damagedMap = returnEntries
+                                .filter { it.damagedNow > 0 }
+                                .associate { it.orderItemId to it.damagedNow }
                             
-                            if (returnMap.isNotEmpty()) {
-                                viewModel.recordReturn(returnMap) {
+                            if (returnMap.isNotEmpty() || damagedMap.isNotEmpty()) {
+                                viewModel.recordReturn(returnMap, damagedMap) {
                                     android.widget.Toast.makeText(context, "Return recorded successfully", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             }
                             showRecordReturnDialog = false
                         },
-                        enabled = returnEntries.any { it.returnedNow > 0 }
+                        enabled = returnEntries.any { it.returnedNow > 0 || it.damagedNow > 0 }
                     ) {
                         Text("Save Return")
                     }
@@ -814,5 +868,6 @@ data class LocalReturnEntry(
     val quantity: Int,
     val alreadyReturned: Int,
     val pendingQuantity: Int,
-    val returnedNow: Int
+    val returnedNow: Int = 0,
+    val damagedNow: Int = 0
 )
